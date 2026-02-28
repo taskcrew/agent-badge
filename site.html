@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Badge</title>
+    <style>
+        :root {
+            /* Severance / Okta Blue-Gray Palette */
+            --corp-bg: #b8c4ce;
+            --corp-panel: #d0d9e0;
+            --corp-dark: #0f2537;
+            --corp-blue: #005587;
+            --highlight: #ffffff;
+            --shadow: #8a9ca8;
+            --screen-bg: #eef2f5;
+            --led-green: #00c853;
+            --led-red: #d50000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            letter-spacing: 0.02em;
+        }
+
+        body {
+            background-color: var(--corp-bg);
+            color: var(--corp-dark);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        /* The Main Terminal/Casing */
+        .terminal-casing {
+            background-color: var(--corp-panel);
+            width: 100%;
+            max-width: 1200px;
+            height: 85vh;
+            border: 2px solid var(--corp-dark);
+            box-shadow:
+                inset 4px 4px 0px var(--highlight),
+                inset -4px -4px 0px var(--shadow),
+                10px 10px 20px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid var(--corp-dark);
+            background: linear-gradient(180deg, var(--corp-panel) 0%, var(--corp-bg) 100%);
+            box-shadow: inset 0px -2px 0px var(--shadow);
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .org-tag {
+            font-family: 'Courier New', Courier, monospace;
+            background: var(--corp-dark);
+            color: var(--corp-panel);
+            padding: 4px 8px;
+            font-size: 0.9rem;
+            box-shadow: inset 2px 2px 0px #000;
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 200px;
+            background-color: var(--corp-panel);
+            border-right: 2px solid var(--corp-dark);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: inset -2px 0px 0px var(--shadow);
+        }
+
+        /* Physical Buttons */
+        .skeuo-btn {
+            background: var(--corp-panel);
+            border: 2px solid var(--corp-dark);
+            padding: 10px 15px;
+            text-align: left;
+            font-weight: bold;
+            color: var(--corp-dark);
+            cursor: pointer;
+            box-shadow:
+                inset 2px 2px 0px var(--highlight),
+                inset -2px -2px 0px var(--shadow);
+            transition: all 0.05s linear;
+        }
+
+        .skeuo-btn:active, .skeuo-btn.active {
+            background: var(--corp-bg);
+            box-shadow:
+                inset 3px 3px 5px var(--shadow),
+                inset -1px -1px 0px var(--highlight);
+            transform: translateY(1px);
+        }
+
+        .skeuo-btn.primary {
+            background: var(--corp-blue);
+            color: #fff;
+            box-shadow:
+                inset 2px 2px 0px #429bd6,
+                inset -2px -2px 0px #002b49;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        /* Content Area */
+        main {
+            flex: 1;
+            background-color: var(--screen-bg);
+            padding: 2rem;
+            box-shadow: inset 5px 5px 15px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        /* Views */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        h2 {
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--corp-dark);
+            padding-bottom: 0.5rem;
+        }
+
+        /* Monospace Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Courier New', Courier, monospace;
+            background: #fff;
+            border: 2px solid var(--corp-dark);
+            box-shadow: 4px 4px 0px var(--shadow);
+        }
+
+        th, td {
+            border: 1px solid var(--corp-dark);
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background: var(--corp-panel);
+            text-transform: uppercase;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 0.85rem;
+            box-shadow: inset 1px 1px 0px var(--highlight);
+        }
+
+        .code-block {
+            background: var(--corp-screen);
+            color: var(--corp-dark);
+            padding: 4px 8px;
+            border: 1px solid var(--shadow);
+        }
+
+        /* Status LEDs */
+        .status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1px solid #000;
+            box-shadow: inset -2px -2px 2px rgba(0,0,0,0.5);
+            margin-right: 8px;
+        }
+        .status.green { background-color: var(--led-green); }
+        .status.red { background-color: var(--led-red); }
+
+        /* Footer */
+        footer {
+            padding: 0.5rem 2rem;
+            border-top: 2px solid var(--corp-dark);
+            background-color: var(--corp-panel);
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+            box-shadow: inset 0px 2px 0px var(--highlight);
+        }
+
+        footer span { cursor: pointer; color: var(--corp-blue); }
+        footer span:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="terminal-casing">
+        <header>
+            <div class="logo">
+                🛡️ AGENT BADGE
+            </div>
+            <div class="org-tag">[ORG: ACME CORP]</div>
+        </header>
+
+        <div class="main-layout">
+            <aside>
+                <button class="skeuo-btn primary" onclick="alert('Initializing Key Generation Protocol...')">INITIALIZE AGENT</button>
+                <button class="skeuo-btn active" onclick="switchView('agents', this)">AGENTS</button>
+                <button class="skeuo-btn" onclick="switchView('vaults', this)">VAULTS</button>
+                <button class="skeuo-btn" onclick="switchView('activity', this)">ACTIVITY</button>
+            </aside>
+
+            <main>
+                <div id="agents" class="view active">
+                    <h2>Registered Agents</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Agent Identifier</th>
+                                <th>Assigned Key (Masked)</th>
+                                <th>Vault Access</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="status green"></span> Active</td>
+                                <td>ScraperBot-Alpha</td>
+                                <td><span class="code-block">ak_live_••••••••8x9q</span></td>
+                                <td>Marketing Passwords</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status green"></span> Active</td>
+                                <td>Support-Responder</td>
+                                <td><span class="code-block">ak_live_••••••••2m4z</span></td>
+                                <td>Zendesk Core</td>
+                            </tr>
+                            <tr>
+                                <td><span class="status red"></span> Revoked</td>
+                                <td>Test-Agent-01</td>
+                                <td><span class="code-block">ak_test_••••••••0p1l</span></td>
+                                <td>None</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="vaults" class="view">
+                    <h2>Connected Vaults [1Password Auth]</h2>
+                    <table style="margin-bottom: 1rem;">
+                        <thead>
+                            <tr>
+                                <th>Site Name</th>
+                                <th>Username / Identity</th>
+                                <th>Last Accessed By Agent</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Stripe Dashboard</td>
+                                <td>finance@acmecorp.com</td>
+                                <td>Never</td>
+                            </tr>
+                            <tr>
+                                <td>X (Twitter)</td>
+                                <td>@AcmeCorp</td>
+                                <td>ScraperBot-Alpha (2 hrs ago)</td>
+                            </tr>
+                            <tr>
+                                <td>Zendesk Admin</td>
+                                <td>support-api@acmecorp.com</td>
+                                <td>Support-Responder (10 mins ago)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button class="skeuo-btn">ADD CREDENTIAL ENTRY</button>
+                </div>
+
+                <div id="activity" class="view">
+                    <h2>Real-Time Audit Trail</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Agent</th>
+                                <th>Target Site</th>
+                                <th>Action</th>
+                                <th>Resolution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>14:58:12 PST</td>
+                                <td>Support-Responder</td>
+                                <td>Zendesk Admin</td>
+                                <td>AUTH_REQUEST</td>
+                                <td><span class="status green"></span> SUCCESS</td>
+                            </tr>
+                            <tr>
+                                <td>14:22:05 PST</td>
+                                <td>ScraperBot-Alpha</td>
+                                <td>X (Twitter)</td>
+                                <td>AUTH_REQUEST</td>
+                                <td><span class="status green"></span> SUCCESS</td>
+                            </tr>
+                            <tr>
+                                <td>09:15:44 PST</td>
+                                <td>Test-Agent-01</td>
+                                <td>Stripe Dashboard</td>
+                                <td>AUTH_REQUEST</td>
+                                <td><span class="status red"></span> DENIED (Revoked)</td>
+                            </tr>
+                            <tr>
+                                <td>09:12:01 PST</td>
+                                <td>Admin User</td>
+                                <td>System</td>
+                                <td>KEY_REVOKE</td>
+                                <td><span class="status green"></span> SUCCESS</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+
+        <footer>
+            <span>Docs</span> •
+            <span>Settings</span> •
+            <span>System Status: Optimal</span>
+        </footer>
+    </div>
+
+    <script>
+        function switchView(viewId, btnElement) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            // Remove active state from all buttons (except primary)
+            document.querySelectorAll('.skeuo-btn:not(.primary)').forEach(el => el.classList.remove('active'));
+
+            // Show target view
+            document.getElementById(viewId).classList.add('active');
+            // Depress the clicked button
+            btnElement.classList.add('active');
+        }
+    </script>
+</body>
+</html>
