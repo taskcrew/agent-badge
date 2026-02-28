@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Badge — Design Playground</title>
+    <style>
+        :root {
+            --ui-bg: #111;
+            --ui-surface: #1a1a1a;
+            --ui-border: #333;
+            --ui-text: #ccc;
+            --ui-text-dim: #777;
+            --ui-accent: #4df3ff;
+            --ui-accent-dim: rgba(77,243,255,0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--ui-bg);
+            color: var(--ui-text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- CONTROLS PANEL --- */
+        .controls {
+            width: 300px;
+            min-width: 300px;
+            border-right: 1px solid var(--ui-border);
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .controls h1 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--ui-accent);
+            margin-bottom: 4px;
+        }
+
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ctrl-group label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--ui-text-dim);
+        }
+
+        /* Radio pill groups */
+        .pill-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .pill-group input[type="radio"] { display: none; }
+
+        .pill-group label.pill {
+            padding: 6px 10px;
+            border: 1px solid var(--ui-border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--ui-text);
+            transition: all 0.1s;
+            user-select: none;
+        }
+
+        .pill-group input[type="radio"]:checked + label.pill {
+            background: var(--ui-accent);
+            color: #000;
+            border-color: var(--ui-accent);
+        }
+
+        /* Toggle switches */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-row span {
+            font-size: 12px;
+            color: var(--ui-text);
+        }
+
+        .switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .switch .slider {
+            position: absolute;
+            inset: 0;
+            background: var(--ui-border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .switch .slider::before {
+            content: "";
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+
+        .switch input:checked + .slider { background: var(--ui-accent); }
+        .switch input:checked + .slider::before { transform: translateX(16px); }
+
+        /* Presets */
+        .presets {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .preset-btn {
+            background: var(--ui-surface);
+            border: 1px solid var(--ui-border);
+            color: var(--ui-text);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: left;
+            transition: all 0.1s;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--ui-accent);
+            background: var(--ui-accent-dim);
+        }
+
+        /* --- RIGHT SIDE --- */
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Preview area */
+        .preview-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            overflow: auto;
+            position: relative;
+        }
+
+        .preview-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+        }
+
+        /* Prompt output */
+        .prompt-area {
+            border-top: 1px solid var(--ui-border);
+            padding: 16px 20px;
+            background: var(--ui-surface);
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .prompt-area .prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .prompt-area .prompt-header span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--ui-text-dim);
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--ui-border);
+            color: var(--ui-text);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+        }
+
+        .copy-btn:hover { border-color: var(--ui-accent); color: var(--ui-accent); }
+        .copy-btn.copied { background: var(--ui-accent); color: #000; border-color: var(--ui-accent); }
+
+        #prompt-text {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--ui-text);
+            white-space: pre-wrap;
+        }
+
+        /* ============================================
+           BADGE STYLES — rendered inside preview
+           ============================================ */
+
+        .badge-stage {
+            position: relative;
+            z-index: 1;
+            perspective: 800px;
+        }
+
+        .badge {
+            width: 340px;
+            position: relative;
+            border-radius: var(--badge-radius, 8px);
+            overflow: hidden;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+        }
+
+        .badge.breathing {
+            animation: breathe var(--breathe-dur, 4s) ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        .badge-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Holographic overlay */
+        .holo-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity 0.3s;
+            background: linear-gradient(
+                135deg,
+                rgba(255,0,0,0.08) 0%,
+                rgba(255,255,0,0.06) 20%,
+                rgba(0,255,0,0.08) 40%,
+                rgba(0,255,255,0.06) 60%,
+                rgba(0,0,255,0.08) 80%,
+                rgba(255,0,255,0.06) 100%
+            );
+            mix-blend-mode: color-dodge;
+        }
+
+        .badge:hover .holo-overlay.visible { opacity: 1; }
+
+        /* NFC ripple */
+        .nfc-ripple {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid var(--ripple-color, #4df3ff);
+            width: 20px;
+            height: 20px;
+            opacity: 0;
+            z-index: 20;
+            pointer-events: none;
+            animation: rippleOut 0.8s ease-out forwards;
+        }
+
+        @keyframes rippleOut {
+            0% { transform: scale(0); opacity: 0.7; }
+            100% { transform: scale(8); opacity: 0; }
+        }
+
+        /* Mag stripe scan */
+        .mag-stripe-el {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mag-scan-line {
+            position: absolute;
+            top: 0;
+            left: -30%;
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            pointer-events: none;
+        }
+
+        .mag-stripe-el:hover .mag-scan-line {
+            animation: magScan 1.2s ease-in-out;
+        }
+
+        @keyframes magScan {
+            0% { left: -30%; }
+            100% { left: 100%; }
+        }
+
+        /* Chip glint */
+        .chip-pad {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chip-glint {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.4) 50%, transparent 60%);
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .chip-pad:hover .chip-glint {
+            animation: glint 0.6s ease-out;
+        }
+
+        @keyframes glint {
+            0% { opacity: 0; transform: translateX(-60%) translateY(-60%); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(60%) translateY(60%); }
+        }
+
+        /* Status LED */
+        .status-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        .status-led.active {
+            background: #00c853;
+            box-shadow: 0 0 4px #00c853;
+            animation: ledBlink 2s ease-in-out infinite;
+        }
+
+        .status-led.revoked {
+            background: #d50000;
+            box-shadow: 0 0 4px #d50000;
+        }
+
+        .status-led.expired {
+            background: #ff9800;
+            box-shadow: 0 0 4px #ff9800;
+            animation: ledBlink 3s ease-in-out infinite;
+        }
+
+        @keyframes ledBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Contactless waves */
+        .contactless-waves {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .contactless-waves .wave {
+            width: 3px;
+            border-radius: 2px;
+            background: currentColor;
+            opacity: 0.4;
+        }
+
+        .contactless-waves.animating .wave {
+            animation: wavePulse 1.5s ease-in-out infinite;
+        }
+
+        .contactless-waves .wave:nth-child(1) { height: 6px; animation-delay: 0s; }
+        .contactless-waves .wave:nth-child(2) { height: 10px; animation-delay: 0.15s; }
+        .contactless-waves .wave:nth-child(3) { height: 14px; animation-delay: 0.3s; }
+        .contactless-waves .wave:nth-child(4) { height: 10px; animation-delay: 0.45s; }
+
+        @keyframes wavePulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Tap pulse ring */
+        .tap-ring {
+            position: absolute;
+            inset: -4px;
+            border-radius: inherit;
+            border: 2px solid transparent;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .tap-ring.pulse {
+            animation: tapPulse 0.6s ease-out;
+        }
+
+        @keyframes tapPulse {
+            0% { border-color: var(--ripple-color, #4df3ff); transform: scale(1); opacity: 1; }
+            100% { border-color: var(--ripple-color, #4df3ff); transform: scale(1.04); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <div>
+        <h1>Badge Playground</h1>
+        <p style="color: var(--ui-text-dim); font-size: 11px; margin-top: 4px;">Explore real-world keycard patterns for Agent Badge UI</p>
+    </div>
+
+    <!-- Presets -->
+    <div class="ctrl-group">
+        <label>Presets</label>
+        <div class="presets">
+            <button class="preset-btn" onclick="applyPreset('corporate')">Corporate ID — Lumon Style</button>
+            <button class="preset-btn" onclick="applyPreset('hotel')">Hotel Keycard — Minimal</button>
+            <button class="preset-btn" onclick="applyPreset('cac')">Gov CAC — Smart Card</button>
+            <button class="preset-btn" onclick="applyPreset('transit')">Transit Pass — Metro</button>
+            <button class="preset-btn" onclick="applyPreset('original')">Original site3 Design</button>
+        </div>
+    </div>
+
+    <!-- Badge variant -->
+    <div class="ctrl-group">
+        <label>Badge Variant</label>
+        <div class="pill-group">
+            <input type="radio" name="variant" id="v-corporate" value="corporate" checked>
+            <label class="pill" for="v-corporate">Corporate ID</label>
+            <input type="radio" name="variant" id="v-hotel" value="hotel">
+            <label class="pill" for="v-hotel">Hotel Key</label>
+            <input type="radio" name="variant" id="v-cac" value="cac">
+            <label class="pill" for="v-cac">CAC / Smart</label>
+            <input type="radio" name="variant" id="v-transit" value="transit">
+            <label class="pill" for="v-transit">Transit Pass</label>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div class="ctrl-group">
+        <label>Agent Status</label>
+        <div class="pill-group">
+            <input type="radio" name="status" id="s-active" value="active" checked>
+            <label class="pill" for="s-active">Active</label>
+            <input type="radio" name="status" id="s-revoked" value="revoked">
+            <label class="pill" for="s-revoked">Revoked</label>
+            <input type="radio" name="status" id="s-expired" value="expired">
+            <label class="pill" for="s-expired">Expired</label>
+        </div>
+    </div>
+
+    <!-- Color scheme -->
+    <div class="ctrl-group">
+        <label>Color Scheme</label>
+        <div class="pill-group">
+            <input type="radio" name="scheme" id="c-cyan" value="cyan" checked>
+            <label class="pill" for="c-cyan">Cyan Terminal</label>
+            <input type="radio" name="scheme" id="c-warm" value="warm">
+            <label class="pill" for="c-warm">Warm Corp</label>
+            <input type="radio" name="scheme" id="c-gov" value="gov">
+            <label class="pill" for="c-gov">Gov Green</label>
+            <input type="radio" name="scheme" id="c-orange" value="orange">
+            <label class="pill" for="c-orange">Transit Orange</label>
+        </div>
+    </div>
+
+    <!-- Animation intensity -->
+    <div class="ctrl-group">
+        <label>Animation Intensity</label>
+        <div class="pill-group">
+            <input type="radio" name="anim" id="a-subtle" value="subtle" checked>
+            <label class="pill" for="a-subtle">Subtle</label>
+            <input type="radio" name="anim" id="a-medium" value="medium">
+            <label class="pill" for="a-medium">Medium</label>
+            <input type="radio" name="anim" id="a-dramatic" value="dramatic">
+            <label class="pill" for="a-dramatic">Dramatic</label>
+        </div>
+    </div>
+
+    <!-- Toggles -->
+    <div class="ctrl-group">
+        <label>Features</label>
+        <div class="toggle-row">
+            <span>Magnetic Stripe</span>
+            <label class="switch"><input type="checkbox" id="t-magstripe" checked onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span>Holographic Overlay</span>
+            <label class="switch"><input type="checkbox" id="t-holo" checked onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span>Breathing Animation</span>
+            <label class="switch"><input type="checkbox" id="t-breathe" checked onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span>Contactless Waves</span>
+            <label class="switch"><input type="checkbox" id="t-waves" onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span>Chip Contact Pad</span>
+            <label class="switch"><input type="checkbox" id="t-chip" onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+            <span>Barcode</span>
+            <label class="switch"><input type="checkbox" id="t-barcode" checked onchange="updateAll()"><span class="slider"></span></label>
+        </div>
+    </div>
+</div>
+
+<div class="right-panel">
+    <div class="preview-area">
+        <canvas class="preview-bg" id="bg-canvas"></canvas>
+        <div class="badge-stage" id="badge-stage"></div>
+    </div>
+
+    <div class="prompt-area">
+        <div class="prompt-header">
+            <span>Generated Prompt</span>
+            <button class="copy-btn" id="copy-btn" onclick="copyPrompt()">Copy</button>
+        </div>
+        <div id="prompt-text"></div>
+    </div>
+</div>
+
+<script>
+// --- STATE ---
+const DEFAULTS = {
+    variant: 'corporate',
+    status: 'active',
+    scheme: 'cyan',
+    anim: 'subtle',
+    magStripe: true,
+    holo: true,
+    breathe: true,
+    waves: false,
+    chip: false,
+    barcode: true,
+};
+
+const state = { ...DEFAULTS };
+
+const SCHEMES = {
+    cyan:   { bg: '#020c17', accent: '#4df3ff', accentDim: '#1e6c7a', card: '#e8ecef', cardShadow: '#b0bfc6', ink: '#0f1c29', inkMuted: '#4a5c6e', name: 'Cyan Terminal' },
+    warm:   { bg: '#1a1410', accent: '#d4a574', accentDim: '#7a5c3a', card: '#f0ebe4', cardShadow: '#c4b8aa', ink: '#2c1e10', inkMuted: '#7a6b5a', name: 'Warm Corporate' },
+    gov:    { bg: '#0a1a0e', accent: '#4caf50', accentDim: '#2e6e32', card: '#e0e8e2', cardShadow: '#a8b8aa', ink: '#1a2e1c', inkMuted: '#4a6e4c', name: 'Government Green' },
+    orange: { bg: '#1a0e02', accent: '#ff9800', accentDim: '#8a5200', card: '#faf0e6', cardShadow: '#c8b8a4', ink: '#2e1a05', inkMuted: '#7a6040', name: 'Transit Orange' },
+};
+
+const AGENT = { name: 'Scraper-Alpha', id: '01', clearance: 'MKT_VAULT', key: 'AK_\u2022\u2022\u2022\u20228X9Q' };
+
+// --- EVENT BINDING ---
+document.querySelectorAll('input[name="variant"]').forEach(r => r.addEventListener('change', e => { state.variant = e.target.value; updateAll(); }));
+document.querySelectorAll('input[name="status"]').forEach(r => r.addEventListener('change', e => { state.status = e.target.value; updateAll(); }));
+document.querySelectorAll('input[name="scheme"]').forEach(r => r.addEventListener('change', e => { state.scheme = e.target.value; updateAll(); }));
+document.querySelectorAll('input[name="anim"]').forEach(r => r.addEventListener('change', e => { state.anim = e.target.value; updateAll(); }));
+
+function readToggles() {
+    state.magStripe = document.getElementById('t-magstripe').checked;
+    state.holo = document.getElementById('t-holo').checked;
+    state.breathe = document.getElementById('t-breathe').checked;
+    state.waves = document.getElementById('t-waves').checked;
+    state.chip = document.getElementById('t-chip').checked;
+    state.barcode = document.getElementById('t-barcode').checked;
+}
+
+// --- PRESETS ---
+function applyPreset(name) {
+    const presets = {
+        corporate: { variant:'corporate', status:'active', scheme:'cyan', anim:'subtle', magStripe:false, holo:true, breathe:true, waves:false, chip:false, barcode:true },
+        hotel:     { variant:'hotel', status:'active', scheme:'warm', anim:'subtle', magStripe:true, holo:false, breathe:true, waves:false, chip:false, barcode:false },
+        cac:       { variant:'cac', status:'active', scheme:'gov', anim:'medium', magStripe:false, holo:true, breathe:false, waves:false, chip:true, barcode:false },
+        transit:   { variant:'transit', status:'active', scheme:'orange', anim:'medium', magStripe:false, holo:false, breathe:true, waves:true, chip:false, barcode:false },
+        original:  { variant:'corporate', status:'active', scheme:'cyan', anim:'subtle', magStripe:true, holo:false, breathe:false, waves:false, chip:false, barcode:false },
+    };
+    Object.assign(state, presets[name]);
+    syncControls();
+    updateAll();
+}
+
+function syncControls() {
+    document.querySelector(`input[name="variant"][value="${state.variant}"]`).checked = true;
+    document.querySelector(`input[name="status"][value="${state.status}"]`).checked = true;
+    document.querySelector(`input[name="scheme"][value="${state.scheme}"]`).checked = true;
+    document.querySelector(`input[name="anim"][value="${state.anim}"]`).checked = true;
+    document.getElementById('t-magstripe').checked = state.magStripe;
+    document.getElementById('t-holo').checked = state.holo;
+    document.getElementById('t-breathe').checked = state.breathe;
+    document.getElementById('t-waves').checked = state.waves;
+    document.getElementById('t-chip').checked = state.chip;
+    document.getElementById('t-barcode').checked = state.barcode;
+}
+
+// --- RENDER ---
+function updateAll() {
+    readToggles();
+    renderBg();
+    renderBadge();
+    updatePrompt();
+}
+
+function renderBg() {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    const s = SCHEMES[state.scheme];
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    // Fill bg
+    ctx.fillStyle = s.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid lines
+    ctx.strokeStyle = s.accentDim + '33';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < canvas.width; x += 30) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 30) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Center glow
+    const grd = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width*0.4);
+    grd.addColorStop(0, s.accent + '0d');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function renderBadge() {
+    const s = SCHEMES[state.scheme];
+    const stage = document.getElementById('badge-stage');
+    const animMult = state.anim === 'subtle' ? 1 : state.anim === 'medium' ? 1.6 : 2.5;
+    const breatheDur = state.anim === 'subtle' ? '5s' : state.anim === 'medium' ? '3.5s' : '2s';
+
+    const statusColor = state.status === 'active' ? '#00c853' : state.status === 'revoked' ? '#d50000' : '#ff9800';
+    const statusLabel = state.status.toUpperCase();
+    const isRevoked = state.status === 'revoked';
+
+    let radius, aspectRatio, html;
+
+    // Build variant-specific badge
+    if (state.variant === 'corporate') {
+        radius = '10px';
+        html = buildCorporateBadge(s, statusColor, statusLabel, isRevoked);
+    } else if (state.variant === 'hotel') {
+        radius = '14px';
+        html = buildHotelKey(s, statusColor, statusLabel, isRevoked);
+    } else if (state.variant === 'cac') {
+        radius = '6px';
+        html = buildCACCard(s, statusColor, statusLabel, isRevoked);
+    } else {
+        radius = '16px';
+        html = buildTransitPass(s, statusColor, statusLabel, isRevoked);
+    }
+
+    const badgeClasses = ['badge'];
+    if (state.breathe) badgeClasses.push('breathing');
+
+    stage.innerHTML = `
+        <div class="${badgeClasses.join(' ')}"
+             style="--badge-radius:${radius}; --breathe-dur:${breatheDur}; --ripple-color:${s.accent};
+                    border-radius:${radius};
+                    background:${s.card};
+                    box-shadow: inset 2px 2px 4px ${s.card === '#e8ecef' ? '#fff' : 'rgba(255,255,255,0.3)'},
+                                inset -2px -2px 6px ${s.cardShadow},
+                                12px 12px 30px rgba(0,0,0,0.5);
+                    ${isRevoked ? 'opacity:0.65; filter:grayscale(40%);' : ''}"
+             onclick="createRipple(event, this)"
+             onmousemove="moveHolo(event, this)">
+            <div class="holo-overlay ${state.holo ? 'visible' : ''}"></div>
+            <div class="tap-ring" id="tap-ring"></div>
+            <div class="badge-inner" style="color:${s.ink};">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
+function buildCorporateBadge(s, statusColor, statusLabel, isRevoked) {
+    return `
+        <!-- Lanyard punch hole -->
+        <div style="width:50px; height:12px; background:${s.bg}; border:1px solid ${s.accentDim};
+                     border-radius:8px; margin:12px auto 16px;
+                     box-shadow: inset 2px 2px 4px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.6);
+                     background-image: radial-gradient(circle, ${s.accent}15 0%, transparent 100%);"></div>
+
+        <!-- Company watermark -->
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg);
+                     font-size:4rem; font-weight:900; opacity:0.04; pointer-events:none;
+                     letter-spacing:0.1em; color:${s.ink};">ACME</div>
+
+        ${state.magStripe ? buildMagStripe(s) : ''}
+
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:0 16px;">
+            <div>
+                <div style="font-size:0.65rem; color:${s.inkMuted}; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:2px;">Agent Identifier</div>
+                <div style="font-weight:800; font-size:1.5rem; letter-spacing:-0.02em; text-transform:uppercase;
+                            ${isRevoked ? 'text-decoration:line-through; color:#d93829;' : ''}">${AGENT.name}</div>
+            </div>
+            <div style="font-size:2rem; color:${s.accentDim}; font-weight:200;">${AGENT.id}</div>
+        </div>
+
+        <!-- Photo placeholder + data -->
+        <div style="display:flex; gap:14px; padding:0 16px;">
+            <div style="width:72px; height:90px; background:${s.cardShadow}; border:2px solid ${s.cardShadow};
+                        display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${s.inkMuted}" stroke-width="1.5">
+                    <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/>
+                </svg>
+            </div>
+            <div style="background:#fff; border:2px solid ${s.cardShadow}; padding:10px; flex:1; font-size:0.8rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                    <span style="color:${s.inkMuted}; font-size:0.7rem; text-transform:uppercase;">Clearance</span>
+                    <span style="font-weight:600; font-family:monospace;">${AGENT.clearance}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                    <span style="color:${s.inkMuted}; font-size:0.7rem; text-transform:uppercase;">Key Sig</span>
+                    <span style="font-weight:600; font-family:monospace; letter-spacing:0.08em;">${AGENT.key}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; border-top:1px dashed ${s.cardShadow}; padding-top:6px; margin-top:4px;">
+                    <span style="color:${s.inkMuted}; font-size:0.7rem; text-transform:uppercase;">Status</span>
+                    <span style="font-weight:700; color:${statusColor}; display:flex; align-items:center;">
+                        <span class="status-led ${state.status}"></span>${statusLabel}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        ${state.chip ? buildChipPad(s) : ''}
+        ${state.waves ? buildWaves(s) : ''}
+        ${state.barcode ? buildBarcode(s) : ''}
+
+        <div style="padding:6px 16px 12px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.6rem; color:${s.inkMuted}; letter-spacing:0.15em;">ACME CORP // BADGE_OS v2.1</span>
+            ${state.waves ? `<div class="contactless-waves ${state.breathe ? 'animating' : ''}" style="color:${s.accentDim};">
+                <div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
+            </div>` : ''}
+        </div>
+    `;
+}
+
+function buildHotelKey(s, statusColor, statusLabel, isRevoked) {
+    return `
+        <!-- Color accent stripe -->
+        <div style="height:60px; background:linear-gradient(135deg, ${s.accent}, ${s.accentDim}); margin-bottom:0;
+                     display:flex; align-items:center; justify-content:space-between; padding:0 20px;">
+            <span style="color:${s.bg}; font-weight:800; font-size:0.75rem; letter-spacing:0.15em; text-transform:uppercase;">ACME HOTELS</span>
+            <span style="color:${s.bg}; font-size:1.8rem; font-weight:200; opacity:0.5;">${AGENT.id}</span>
+        </div>
+
+        ${state.magStripe ? buildMagStripe(s) : ''}
+
+        <div style="padding:20px 20px 8px; text-align:center;">
+            <div style="font-size:3rem; font-weight:200; letter-spacing:0.1em; color:${s.ink};
+                        ${isRevoked ? 'text-decoration:line-through; color:#d93829;' : ''}">
+                ${AGENT.clearance}
+            </div>
+            <div style="font-size:0.7rem; color:${s.inkMuted}; letter-spacing:0.2em; margin-top:4px;">ACCESS ZONE</div>
+        </div>
+
+        <div style="padding:0 20px;">
+            <div style="border-top:1px solid ${s.cardShadow}; padding-top:12px; display:flex; justify-content:space-between; font-size:0.8rem;">
+                <div>
+                    <div style="color:${s.inkMuted}; font-size:0.65rem; text-transform:uppercase;">Holder</div>
+                    <div style="font-weight:600; margin-top:2px;">${AGENT.name}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="color:${s.inkMuted}; font-size:0.65rem; text-transform:uppercase;">Status</div>
+                    <div style="font-weight:700; color:${statusColor}; display:flex; align-items:center; justify-content:flex-end; margin-top:2px;">
+                        <span class="status-led ${state.status}"></span>${statusLabel}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        ${state.chip ? buildChipPad(s) : ''}
+
+        <div style="padding:10px 20px 16px; text-align:center;">
+            <span style="font-size:0.55rem; color:${s.inkMuted}; letter-spacing:0.2em;">INSERT CARD WITH ARROW FACING UP</span>
+        </div>
+    `;
+}
+
+function buildCACCard(s, statusColor, statusLabel, isRevoked) {
+    return `
+        <!-- Dense header bar -->
+        <div style="background:${s.ink}; padding:8px 16px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="color:${s.accent}; font-size:0.7rem; font-weight:700; letter-spacing:0.15em;">COMMON ACCESS CARD</span>
+            <span style="color:${s.accentDim}; font-size:0.6rem;">SEC-${AGENT.id}-CAC</span>
+        </div>
+
+        <div style="display:flex; gap:14px; padding:14px 16px;">
+            <!-- Photo + chip column -->
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="width:80px; height:100px; background:${s.cardShadow}; border:2px solid ${s.ink};
+                            display:flex; align-items:center; justify-content:center;">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="${s.inkMuted}" stroke-width="1.5">
+                        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/>
+                    </svg>
+                </div>
+                ${state.chip ? `
+                <div class="chip-pad" style="width:42px; height:32px; background:linear-gradient(135deg, #d4a017, #f0d060, #c8960a);
+                            border-radius:3px; border:1px solid #a07810; position:relative; overflow:hidden;
+                            box-shadow: inset 1px 1px 2px rgba(255,255,255,0.5);">
+                    <div class="chip-glint"></div>
+                    <!-- Contact lines -->
+                    <div style="position:absolute; top:6px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                    <div style="position:absolute; top:12px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                    <div style="position:absolute; top:18px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                    <div style="position:absolute; top:24px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                    <div style="position:absolute; top:4px; left:50%; width:1px; height:24px; background:#a07810;"></div>
+                </div>` : ''}
+            </div>
+
+            <!-- Data dense column -->
+            <div style="flex:1; font-size:0.75rem;">
+                <div style="font-weight:800; font-size:1.2rem; margin-bottom:6px; text-transform:uppercase;
+                            ${isRevoked ? 'text-decoration:line-through; color:#d93829;' : ''}">${AGENT.name}</div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin-bottom:8px;">
+                    <div><span style="color:${s.inkMuted}; font-size:0.6rem;">RANK</span><br><strong>AGENT-L3</strong></div>
+                    <div><span style="color:${s.inkMuted}; font-size:0.6rem;">CLEARANCE</span><br><strong>${AGENT.clearance}</strong></div>
+                    <div><span style="color:${s.inkMuted}; font-size:0.6rem;">KEY SIG</span><br><strong style="font-family:monospace; letter-spacing:0.06em;">${AGENT.key}</strong></div>
+                    <div><span style="color:${s.inkMuted}; font-size:0.6rem;">ISSUED</span><br><strong>2026-01-15</strong></div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:6px; padding-top:6px; border-top:1px dashed ${s.cardShadow};">
+                    <span class="status-led ${state.status}"></span>
+                    <span style="font-weight:700; color:${statusColor}; font-size:0.8rem;">${statusLabel}</span>
+                </div>
+            </div>
+        </div>
+
+        ${state.magStripe ? buildMagStripe(s) : ''}
+
+        <!-- Microprint band -->
+        <div style="padding:3px 16px; font-size:0.35rem; color:${s.cardShadow}; letter-spacing:0.3em; line-height:1; overflow:hidden; white-space:nowrap;">
+            ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-BADGE-OS-V2-ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-BADGE-OS-V2-ACME-CORP
+        </div>
+
+        ${state.barcode ? buildBarcode(s) : ''}
+
+        <div style="padding:4px 16px 10px; display:flex; justify-content:space-between; font-size:0.55rem; color:${s.inkMuted};">
+            <span>PROPERTY OF ACME CORP</span>
+            <span>DO NOT DUPLICATE</span>
+        </div>
+    `;
+}
+
+function buildTransitPass(s, statusColor, statusLabel, isRevoked) {
+    return `
+        <!-- Bold color header -->
+        <div style="background:${s.accent}; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="color:${s.bg}; font-weight:900; font-size:1.4rem; letter-spacing:-0.02em;">ZONE ${AGENT.id}</div>
+                <div style="color:${s.bg}; font-size:0.65rem; opacity:0.7; letter-spacing:0.1em;">ALL-ACCESS PASS</div>
+            </div>
+            <div style="color:${s.bg};">
+                <div class="contactless-waves ${state.waves ? 'animating' : ''}" style="color:${s.bg}; transform:scale(1.5);">
+                    <div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding:16px 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div style="font-weight:800; font-size:1.3rem; text-transform:uppercase;
+                            ${isRevoked ? 'text-decoration:line-through; color:#d93829;' : ''}">${AGENT.name}</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="status-led ${state.status}"></span>
+                    <span style="font-weight:700; color:${statusColor}; font-size:0.85rem;">${statusLabel}</span>
+                </div>
+            </div>
+
+            <div style="background:#fff; border:2px solid ${s.cardShadow}; padding:10px; font-size:0.8rem; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                    <div style="color:${s.inkMuted}; font-size:0.65rem; text-transform:uppercase;">Route Access</div>
+                    <div style="font-weight:600;">${AGENT.clearance}</div>
+                </div>
+                <div>
+                    <div style="color:${s.inkMuted}; font-size:0.65rem; text-transform:uppercase;">Pass ID</div>
+                    <div style="font-weight:600; font-family:monospace;">${AGENT.key}</div>
+                </div>
+            </div>
+        </div>
+
+        ${state.chip ? buildChipPad(s) : ''}
+        ${state.magStripe ? buildMagStripe(s) : ''}
+
+        <!-- Tap instruction -->
+        <div style="padding:8px 20px 14px; text-align:center; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${s.inkMuted}" stroke-width="2">
+                <path d="M12 18v-6M9 12l3-3 3 3"/>
+                <rect x="4" y="2" width="16" height="20" rx="2"/>
+            </svg>
+            <span style="font-size:0.6rem; color:${s.inkMuted}; letter-spacing:0.15em;">TAP TO AUTHENTICATE</span>
+        </div>
+    `;
+}
+
+// --- SHARED ELEMENTS ---
+function buildMagStripe(s) {
+    return `
+        <div class="mag-stripe-el" style="height:30px; background:repeating-linear-gradient(90deg,
+            ${s.ink}, ${s.ink} 2px, ${s.card} 2px, ${s.card} 4px,
+            ${s.ink} 4px, ${s.ink} 7px, ${s.card} 7px, ${s.card} 9px);
+            opacity:0.12; margin:8px 0; position:relative; overflow:hidden;">
+            <div class="mag-scan-line"></div>
+        </div>
+    `;
+}
+
+function buildChipPad(s) {
+    return `
+        <div style="padding:0 16px 4px;">
+            <div class="chip-pad" style="width:42px; height:32px; background:linear-gradient(135deg, #d4a017, #f0d060, #c8960a);
+                        border-radius:3px; border:1px solid #a07810; position:relative; overflow:hidden;
+                        box-shadow: inset 1px 1px 2px rgba(255,255,255,0.5);">
+                <div class="chip-glint"></div>
+                <div style="position:absolute; top:6px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                <div style="position:absolute; top:12px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                <div style="position:absolute; top:18px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                <div style="position:absolute; top:24px; left:4px; right:4px; height:1px; background:#a07810;"></div>
+                <div style="position:absolute; top:4px; left:50%; width:1px; height:24px; background:#a07810;"></div>
+            </div>
+        </div>
+    `;
+}
+
+function buildWaves(s) {
+    return `
+        <div style="padding:4px 16px;">
+            <div class="contactless-waves ${state.breathe ? 'animating' : ''}" style="color:${s.accentDim};">
+                <div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
+            </div>
+        </div>
+    `;
+}
+
+function buildBarcode(s) {
+    // Generate pseudo-barcode
+    const bars = [];
+    const widths = [2,1,3,1,2,1,1,3,2,1,2,1,3,1,1,2,3,1,2,1,1,3,1,2,1,1,2,3,1,2];
+    for (const w of widths) {
+        bars.push(`<div style="width:${w}px; height:100%; background:${s.ink};"></div>`);
+        bars.push(`<div style="width:${Math.max(1, w-1)}px; height:100%;"></div>`);
+    }
+    return `
+        <div style="padding:4px 16px 2px;">
+            <div style="display:flex; align-items:stretch; height:24px; gap:0;">
+                ${bars.join('')}
+            </div>
+            <div style="font-size:0.5rem; color:${s.inkMuted}; letter-spacing:0.3em; margin-top:2px; font-family:monospace;">0x137056 // BADGE_OS</div>
+        </div>
+    `;
+}
+
+// --- INTERACTIONS ---
+function createRipple(e, badge) {
+    const rect = badge.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const ripple = document.createElement('div');
+    ripple.className = 'nfc-ripple';
+    ripple.style.left = (x - 10) + 'px';
+    ripple.style.top = (y - 10) + 'px';
+    badge.appendChild(ripple);
+
+    // Tap ring
+    const ring = badge.querySelector('.tap-ring');
+    ring.classList.remove('pulse');
+    void ring.offsetWidth;
+    ring.classList.add('pulse');
+
+    setTimeout(() => ripple.remove(), 800);
+}
+
+function moveHolo(e, badge) {
+    if (!state.holo) return;
+    const overlay = badge.querySelector('.holo-overlay');
+    if (!overlay) return;
+    const rect = badge.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    overlay.style.background = `
+        radial-gradient(circle at ${x}% ${y}%,
+            rgba(255,0,0,0.12) 0%,
+            rgba(255,255,0,0.08) 15%,
+            rgba(0,255,0,0.1) 30%,
+            rgba(0,255,255,0.08) 45%,
+            rgba(0,0,255,0.1) 60%,
+            rgba(255,0,255,0.06) 80%,
+            transparent 100%
+        )
+    `;
+}
+
+// --- PROMPT ---
+function updatePrompt() {
+    const parts = [];
+    const s = SCHEMES[state.scheme];
+
+    const variantNames = { corporate: 'Corporate ID Badge', hotel: 'Hotel Keycard', cac: 'Government CAC / Smart Card', transit: 'Transit Pass' };
+    parts.push(`Update the badge cards in site3.html to use a **${variantNames[state.variant]}** design pattern.`);
+
+    if (state.scheme !== DEFAULTS.scheme) {
+        parts.push(`Switch the color scheme to ${s.name} (accent: ${s.accent}, background: ${s.bg}, card surface: ${s.card}).`);
+    }
+
+    const features = [];
+    if (state.variant === 'corporate') features.push('a lanyard punch-hole slot at the top, a photo ID placeholder, and a company watermark');
+    if (state.variant === 'hotel') features.push('a bold accent color stripe header, large centered access zone text, and "insert card" instruction');
+    if (state.variant === 'cac') features.push('a dense data grid layout with rank/clearance/issued date, photo placeholder, and microprint security band');
+    if (state.variant === 'transit') features.push('bold color-blocked header with zone number, and a "tap to authenticate" instruction');
+
+    if (state.magStripe) features.push('a magnetic stripe with a scan-line shimmer animation on hover');
+    if (state.holo) features.push('a holographic rainbow overlay that follows the mouse cursor');
+    if (state.chip) features.push('a gold smart card chip contact pad with a glint animation on hover');
+    if (state.waves) features.push('animated contactless/NFC wave indicators');
+    if (state.barcode) features.push('a barcode strip at the bottom');
+    if (state.breathe) features.push(`a gentle breathing/floating idle animation (${state.anim === 'subtle' ? '5s' : state.anim === 'medium' ? '3.5s' : '2s'} cycle)`);
+
+    if (features.length) parts.push(`Include ${features.join(', ')}.`);
+
+    // Status
+    if (state.status !== 'active') {
+        parts.push(`Show the badge in a "${state.status}" state with ${state.status === 'revoked' ? 'reduced opacity, grayscale filter, and a struck-through agent name in red' : 'reduced opacity and an amber blinking status LED'}.`);
+    } else {
+        parts.push('Active badges should have a green blinking status LED.');
+    }
+
+    // Animations
+    if (state.anim !== DEFAULTS.anim) {
+        parts.push(`Use ${state.anim} animation intensity — ${state.anim === 'medium' ? 'slightly faster and more pronounced effects' : 'dramatic, highly visible animations with fast timing'}.`);
+    }
+
+    parts.push('Add an NFC ripple effect on click that radiates outward from the click point.');
+
+    document.getElementById('prompt-text').textContent = parts.join('\n\n');
+}
+
+function copyPrompt() {
+    const text = document.getElementById('prompt-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+}
+
+// --- INIT ---
+window.addEventListener('resize', () => renderBg());
+updateAll();
+</script>
+
+</body>
+</html>

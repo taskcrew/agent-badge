@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Badge - Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* V2 Terminal Colors (Crisp) */
+            --bg-deep: #020c17;
+            --sys-cyan: #4df3ff;
+            --sys-cyan-dim: #1e6c7a;
+            --sys-cyan-dark: #0a2e38;
+            --alert-red: #ff4d4d;
+            
+            /* V3 Physical "Creamy" Badge Colors */
+            --cream-base: #e8ecef; /* Slightly cooler vintage plastic */
+            --cream-highlight: #ffffff;
+            --cream-shadow: #b0bfc6;
+            --ink-dark: #0f1c29;
+            --ink-muted: #4a5c6e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(77, 243, 255, 0.05) 0%, transparent 60%),
+                linear-gradient(var(--sys-cyan-dark) 1px, transparent 1px),
+                linear-gradient(90deg, var(--sys-cyan-dark) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: var(--sys-cyan);
+            font-family: 'IBM Plex Mono', monospace;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Subtle Scanlines (No blurring) */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* --- SIDEBAR NAV (V3 Layout + V2 Styling) --- */
+        nav {
+            width: 260px;
+            border-right: 2px solid var(--sys-cyan-dim);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            background: rgba(2, 12, 23, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        .sys-logo {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.05em;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--sys-cyan);
+            text-shadow: 0 0 8px rgba(77, 243, 255, 0.4);
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--sys-cyan-dim);
+            border: 1px solid transparent;
+            padding: 12px 15px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            text-align: left;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.1s;
+            letter-spacing: 0.05em;
+        }
+
+        .nav-btn:hover {
+            color: var(--sys-cyan);
+            background: rgba(77, 243, 255, 0.05);
+            border-left: 4px solid var(--sys-cyan);
+        }
+
+        .nav-btn.active {
+            color: var(--bg-deep);
+            background: var(--sys-cyan);
+            font-weight: 600;
+            border-left: 4px solid var(--cream-base);
+            box-shadow: 0 0 15px rgba(77, 243, 255, 0.3);
+        }
+
+        /* Physical action button */
+        .print-btn {
+            margin-top: auto;
+            background: var(--cream-base);
+            color: var(--ink-dark);
+            border: 2px solid var(--sys-cyan-dim);
+            padding: 15px;
+            font-weight: bold;
+            box-shadow: inset 2px 2px 0px var(--cream-highlight), inset -2px -2px 0px var(--cream-shadow);
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: 'Inter', sans-serif;
+            transition: transform 0.1s;
+        }
+        .print-btn:active { 
+            box-shadow: inset 2px 2px 4px var(--cream-shadow); 
+            transform: scale(0.98);
+        }
+
+        /* --- MAIN WORKSPACE --- */
+        main {
+            flex: 1;
+            padding: 2rem 4rem;
+            overflow-y: auto;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* V2 Style Terminal Header */
+        .term-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--sys-cyan);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+
+        .term-box {
+            border: 2px solid var(--sys-cyan);
+            padding: 5px 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: rgba(77, 243, 255, 0.1);
+        }
+
+        .progress-track {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .progress-segment {
+            width: 8px; height: 20px;
+            background-color: var(--sys-cyan);
+        }
+        .progress-segment.empty { background-color: var(--sys-cyan-dark); }
+
+        .view { display: none; flex: 1; }
+        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- THE BADGE GRID (Creamy Physical Objects) --- */
+        .badge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2.5rem;
+            padding-top: 1rem;
+        }
+
+        .badge-card {
+            background-color: var(--cream-base);
+            border-radius: 8px;
+            padding: 25px;
+            position: relative;
+            box-shadow: 
+                inset 2px 2px 4px var(--cream-highlight),
+                inset -2px -2px 6px var(--cream-shadow),
+                15px 15px 30px rgba(0,0,0,0.6);
+            color: var(--ink-dark);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        .badge-card:hover { transform: translateY(-5px) scale(1.02); }
+
+        /* Punch Hole cutting through to the dark terminal */
+        .punch-hole {
+            width: 60px;
+            height: 14px;
+            background-color: var(--bg-deep);
+            border: 1px solid var(--sys-cyan-dim);
+            border-radius: 10px;
+            margin: 0 auto 15px auto;
+            box-shadow: inset 3px 3px 5px rgba(0,0,0,0.9), 0px 1px 0px rgba(255,255,255,0.8);
+            /* Adds a slight glow from the terminal screen underneath */
+            background-image: radial-gradient(circle, rgba(77, 243, 255, 0.1) 0%, transparent 100%);
+        }
+
+        .mag-stripe {
+            height: 35px;
+            background: repeating-linear-gradient(
+                90deg,
+                var(--ink-dark), var(--ink-dark) 2px,
+                var(--cream-base) 2px, var(--cream-base) 4px,
+                var(--ink-dark) 4px, var(--ink-dark) 8px,
+                var(--cream-base) 8px, var(--cream-base) 10px
+            );
+            opacity: 0.15;
+            margin-bottom: 10px;
+        }
+
+        .badge-header { display: flex; justify-content: space-between; align-items: flex-start; }
+
+        .agent-name {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+        }
+
+        .badge-data {
+            background: #ffffff;
+            border: 2px solid var(--cream-shadow);
+            padding: 12px;
+            font-size: 0.85rem;
+        }
+
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .data-row:last-child { margin-bottom: 0; }
+        .data-label { color: var(--ink-muted); font-size: 0.75rem; text-transform: uppercase; }
+        .data-val { font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+        .api-key-mask { letter-spacing: 0.1em; }
+
+        /* --- TERMINAL TABLES (V2 Styling for Vaults/Activity) --- */
+        .term-table-container {
+            border: 2px solid var(--sys-cyan-dim);
+            background: rgba(2, 12, 23, 0.6);
+            padding: 2px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px dashed var(--sys-cyan-dim);
+        }
+
+        th {
+            font-family: 'Inter', sans-serif;
+            color: var(--sys-cyan-dim);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            border-bottom: 2px solid var(--sys-cyan);
+            background: rgba(77, 243, 255, 0.05);
+        }
+
+        td { font-size: 0.95rem; }
+        tr:hover td { background: rgba(77, 243, 255, 0.03); }
+        
+        .tag {
+            border: 1px solid var(--sys-cyan);
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            background: rgba(77, 243, 255, 0.1);
+        }
+        
+        .text-red { color: var(--alert-red); text-shadow: 0 0 5px rgba(255,77,77,0.4); }
+        .text-cyan { color: var(--sys-cyan); }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="sys-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 12h8M12 8v8"></path></svg>
+            BADGE_OS
+        </div>
+        
+        <button class="nav-btn active" onclick="switchView('agents', this)">Assigned Badges</button>
+        <button class="nav-btn" onclick="switchView('vaults', this)">Vault Nodes</button>
+        <button class="nav-btn" onclick="switchView('activity', this)">Audit Stream</button>
+
+        <button class="print-btn">Print New Badge</button>
+    </nav>
+
+    <main>
+        <div class="term-header">
+            <div class="term-box" id="view-title">ASSIGNED BADGES</div>
+            <div class="progress-track">
+                <div class="progress-segment"></div>
+                <div class="progress-segment"></div>
+                <div class="progress-segment"></div>
+                <div class="progress-segment"></div>
+                <div class="progress-segment"></div>
+                <div class="progress-segment empty"></div>
+                <div class="progress-segment empty"></div>
+                <div style="margin-left: 10px; font-family: 'Inter', sans-serif; font-size: 0.8rem;">SEC_LVL 05</div>
+            </div>
+        </div>
+
+        <div id="agents" class="view active">
+            <div class="badge-grid">
+                
+                <div class="badge-card">
+                    <div class="punch-hole"></div>
+                    <div class="mag-stripe"></div>
+                    
+                    <div class="badge-header">
+                        <div class="agent-name">Scraper-Alpha</div>
+                        <div style="font-size: 1.5rem; color: var(--sys-cyan-dim);">01</div>
+                    </div>
+                    
+                    <div class="badge-data">
+                        <div class="data-row">
+                            <span class="data-label">Clearance</span>
+                            <span class="data-val">MKT_VAULT</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Key Signature</span>
+                            <span class="data-val api-key-mask">AK_••••8X9Q</span>
+                        </div>
+                        <div class="data-row" style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                            <span class="data-label">Status</span>
+                            <span class="data-val" style="color: #2d8a56;">ACTIVE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="badge-card">
+                    <div class="punch-hole"></div>
+                    <div class="mag-stripe"></div>
+                    
+                    <div class="badge-header">
+                        <div class="agent-name">Support-Bot</div>
+                        <div style="font-size: 1.5rem; color: var(--sys-cyan-dim);">02</div>
+                    </div>
+                    
+                    <div class="badge-data">
+                        <div class="data-row">
+                            <span class="data-label">Clearance</span>
+                            <span class="data-val">CORE_DB</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Key Signature</span>
+                            <span class="data-val api-key-mask">AK_••••2M4Z</span>
+                        </div>
+                        <div class="data-row" style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                            <span class="data-label">Status</span>
+                            <span class="data-val" style="color: #2d8a56;">ACTIVE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="badge-card" style="opacity: 0.6; filter: grayscale(50%);">
+                    <div class="punch-hole"></div>
+                    <div class="mag-stripe"></div>
+                    
+                    <div class="badge-header">
+                        <div class="agent-name" style="color: #d93829; text-decoration: line-through;">Test-Run-01</div>
+                        <div style="font-size: 1.5rem; color: var(--sys-cyan-dim);">03</div>
+                    </div>
+                    
+                    <div class="badge-data">
+                        <div class="data-row">
+                            <span class="data-label">Clearance</span>
+                            <span class="data-val">NULL</span>
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">Key Signature</span>
+                            <span class="data-val api-key-mask">AK_••••0P1L</span>
+                        </div>
+                        <div class="data-row" style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                            <span class="data-label">Status</span>
+                            <span class="data-val" style="color: #d93829;">SEVERED</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div id="vaults" class="view">
+            <div class="term-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vault Node</th>
+                            <th>Identity String</th>
+                            <th>Active Badges</th>
+                            <th>Last Handshake</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-cyan">STRIPE_PRD</td>
+                            <td>finance@acmecorp.com</td>
+                            <td><span class="tag">0</span></td>
+                            <td style="color: var(--sys-cyan-dim);">NULL</td>
+                        </tr>
+                        <tr>
+                            <td class="text-cyan">X_SOCIAL</td>
+                            <td>@AcmeCorp</td>
+                            <td><span class="tag">1</span> [01]</td>
+                            <td>14:22:00</td>
+                        </tr>
+                        <tr>
+                            <td class="text-cyan">ZENDESK_ADM</td>
+                            <td>api@acmecorp.com</td>
+                            <td><span class="tag">1</span> [02]</td>
+                            <td>09:15:33</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="activity" class="view">
+            <div class="term-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SYS_TIME</th>
+                            <th>BADGE_ID</th>
+                            <th>TARGET_NODE</th>
+                            <th>PROTOCOL</th>
+                            <th>RESOLUTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="color: var(--sys-cyan-dim);">14:58:12</td>
+                            <td>Support-Bot [02]</td>
+                            <td class="text-cyan">ZENDESK_ADM</td>
+                            <td>AUTH_REQ</td>
+                            <td>[ GRANTED ]</td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--sys-cyan-dim);">14:22:05</td>
+                            <td>Scraper-Alpha [01]</td>
+                            <td class="text-cyan">X_SOCIAL</td>
+                            <td>AUTH_REQ</td>
+                            <td>[ GRANTED ]</td>
+                        </tr>
+                        <tr>
+                            <td class="text-red">09:15:44</td>
+                            <td class="text-red">Test-Run-01 [03]</td>
+                            <td class="text-red">STRIPE_PRD</td>
+                            <td class="text-red">AUTH_REQ</td>
+                            <td class="text-red">[ DENIED_SEVERED ]</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function switchView(viewId, btnElement) {
+            // Update UI
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(viewId).classList.add('active');
+            btnElement.classList.add('active');
+
+            // Update terminal header text
+            document.getElementById('view-title').innerText = btnElement.innerText.toUpperCase();
+        }
+    </script>
+</body>
+</html>
