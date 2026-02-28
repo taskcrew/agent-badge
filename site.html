@@ -3,363 +3,419 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Badge</title>
+    <title>Agent Badge - Lumon Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Severance / Okta Blue-Gray Palette */
-            --corp-bg: #b8c4ce;
-            --corp-panel: #d0d9e0;
-            --corp-dark: #0f2537;
-            --corp-blue: #005587;
-            --highlight: #ffffff;
-            --shadow: #8a9ca8;
-            --screen-bg: #eef2f5;
-            --led-green: #00c853;
-            --led-red: #d50000;
+            /* Hardware Colors */
+            --case-outer: #e6ecef;
+            --case-shadow: #b0bfc6;
+            --bezel-inner: #0f1c29;
+            
+            /* CRT Screen Colors */
+            --screen-bg: #020c17;
+            --phosphor-cyan: #4df3ff;
+            --phosphor-cyan-dim: #1e6c7a;
+            --phosphor-alert: #ff4d4d;
+            
+            /* Keyboard Colors (Used for UI accents) */
+            --key-teal: #1a7b87;
+            --key-dark: #0d4e57;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            letter-spacing: 0.02em;
         }
 
         body {
-            background-color: var(--corp-bg);
-            color: var(--corp-dark);
+            /* The physical desk background */
+            background-color: #d1d9dd; 
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 2rem;
-        }
-
-        /* The Main Terminal/Casing */
-        .terminal-casing {
-            background-color: var(--corp-panel);
-            width: 100%;
-            max-width: 1200px;
-            height: 85vh;
-            border: 2px solid var(--corp-dark);
-            box-shadow:
-                inset 4px 4px 0px var(--highlight),
-                inset -4px -4px 0px var(--shadow),
-                10px 10px 20px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-            border-bottom: 2px solid var(--corp-dark);
-            background: linear-gradient(180deg, var(--corp-panel) 0%, var(--corp-bg) 100%);
-            box-shadow: inset 0px -2px 0px var(--shadow);
-        }
-
-        .logo {
-            font-weight: 700;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .org-tag {
-            font-family: 'Courier New', Courier, monospace;
-            background: var(--corp-dark);
-            color: var(--corp-panel);
-            padding: 4px 8px;
-            font-size: 0.9rem;
-            box-shadow: inset 2px 2px 0px #000;
-        }
-
-        /* Main Layout */
-        .main-layout {
-            display: flex;
-            flex: 1;
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            text-transform: uppercase;
             overflow: hidden;
         }
 
-        /* Sidebar */
-        aside {
-            width: 200px;
-            background-color: var(--corp-panel);
-            border-right: 2px solid var(--corp-dark);
-            padding: 1rem;
+        /* 1. The Physical Machine */
+        .hardware-case {
+            background-color: var(--case-outer);
+            padding: 30px;
+            border-radius: 40px;
+            box-shadow: 
+                inset 5px 5px 10px #fff,
+                inset -5px -5px 15px var(--case-shadow),
+                20px 20px 40px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 1100px;
+            height: 90vh;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            box-shadow: inset -2px 0px 0px var(--shadow);
         }
 
-        /* Physical Buttons */
-        .skeuo-btn {
-            background: var(--corp-panel);
-            border: 2px solid var(--corp-dark);
-            padding: 10px 15px;
-            text-align: left;
-            font-weight: bold;
-            color: var(--corp-dark);
-            cursor: pointer;
-            box-shadow:
-                inset 2px 2px 0px var(--highlight),
-                inset -2px -2px 0px var(--shadow);
-            transition: all 0.05s linear;
-        }
-
-        .skeuo-btn:active, .skeuo-btn.active {
-            background: var(--corp-bg);
-            box-shadow:
-                inset 3px 3px 5px var(--shadow),
-                inset -1px -1px 0px var(--highlight);
-            transform: translateY(1px);
-        }
-
-        .skeuo-btn.primary {
-            background: var(--corp-blue);
-            color: #fff;
-            box-shadow:
-                inset 2px 2px 0px #429bd6,
-                inset -2px -2px 0px #002b49;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-
-        /* Content Area */
-        main {
+        /* 2. The Dark Bezel */
+        .hardware-bezel {
+            background-color: var(--bezel-inner);
             flex: 1;
-            background-color: var(--screen-bg);
-            padding: 2rem;
-            box-shadow: inset 5px 5px 15px rgba(0,0,0,0.1);
-            overflow-y: auto;
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: 
+                inset 0px 0px 20px #000,
+                inset 2px 2px 5px rgba(255,255,255,0.1),
+                0px 5px 10px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
         }
 
-        /* Views */
+        /* 3. The CRT Glass Screen */
+        .crt-screen {
+            background-color: var(--screen-bg);
+            width: 100%;
+            height: 100%;
+            border-radius: 50px / 30px; /* Slight tube curvature */
+            position: relative;
+            overflow: hidden;
+            color: var(--phosphor-cyan);
+            text-shadow: 
+                0 0 2px var(--phosphor-cyan),
+                0 0 8px var(--phosphor-cyan);
+            box-shadow: inset 0 0 50px #000;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            animation: flicker 0.15s infinite alternate;
+        }
+
+        /* CRT Scanlines Overlay */
+        .crt-screen::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Screen Glare */
+        .crt-screen::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 60%);
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        /* Screen Flicker Animation */
+        @keyframes flicker {
+            0% { opacity: 0.98; }
+            100% { opacity: 1; }
+        }
+
+        /* Screen Layout */
+        .ui-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid var(--phosphor-cyan);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 5;
+        }
+
+        .header-box {
+            border: 2px solid var(--phosphor-cyan);
+            padding: 5px 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: inset 0 0 10px rgba(77, 243, 255, 0.2);
+        }
+
+        .progress-track {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .progress-segment {
+            width: 8px;
+            height: 20px;
+            background-color: var(--phosphor-cyan);
+            box-shadow: 0 0 5px var(--phosphor-cyan);
+        }
+        .progress-segment.empty { background-color: var(--phosphor-cyan-dim); box-shadow: none; }
+
+        .corp-logo {
+            border: 2px solid var(--phosphor-cyan);
+            border-radius: 50%;
+            padding: 5px 15px;
+            font-style: italic;
+            letter-spacing: 2px;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 30px;
+            z-index: 5;
+            position: relative;
+        }
+
+        /* Navigation (Modeled after keyboard keys) */
+        nav {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 220px;
+        }
+
+        button {
+            background: transparent;
+            color: var(--phosphor-cyan);
+            border: 2px solid var(--phosphor-cyan-dim);
+            padding: 12px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            text-align: left;
+            cursor: pointer;
+            text-transform: uppercase;
+            text-shadow: inherit;
+            transition: all 0.1s;
+        }
+
+        button:hover {
+            border-color: var(--phosphor-cyan);
+            background: rgba(77, 243, 255, 0.1);
+        }
+
+        button.active {
+            background: var(--phosphor-cyan);
+            color: var(--screen-bg);
+            text-shadow: none;
+            box-shadow: 0 0 15px var(--phosphor-cyan);
+        }
+
+        button.action {
+            background: var(--key-teal);
+            color: #fff;
+            border-color: var(--key-dark);
+            text-shadow: none;
+            margin-bottom: 20px;
+            box-shadow: inset 2px 2px 0px rgba(255,255,255,0.2), inset -2px -2px 0px rgba(0,0,0,0.3);
+        }
+        button.action:active { transform: scale(0.98); }
+
+        /* Views Area */
+        .workspace {
+            flex: 1;
+            border: 2px solid var(--phosphor-cyan-dim);
+            padding: 20px;
+            position: relative;
+        }
+
         .view { display: none; }
         .view.active { display: block; }
 
-        h2 {
-            margin-bottom: 1.5rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            border-bottom: 2px solid var(--corp-dark);
-            padding-bottom: 0.5rem;
-        }
-
-        /* Monospace Tables */
+        /* Lumon-style Data Grid */
         table {
             width: 100%;
             border-collapse: collapse;
-            font-family: 'Courier New', Courier, monospace;
-            background: #fff;
-            border: 2px solid var(--corp-dark);
-            box-shadow: 4px 4px 0px var(--shadow);
         }
 
         th, td {
-            border: 1px solid var(--corp-dark);
-            padding: 12px;
+            padding: 12px 10px;
             text-align: left;
+            border-bottom: 1px dashed var(--phosphor-cyan-dim);
         }
 
         th {
-            background: var(--corp-panel);
-            text-transform: uppercase;
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            font-size: 0.85rem;
-            box-shadow: inset 1px 1px 0px var(--highlight);
+            color: var(--phosphor-cyan);
+            font-size: 0.9rem;
+            border-bottom: 2px solid var(--phosphor-cyan);
         }
 
-        .code-block {
-            background: var(--corp-screen);
-            color: var(--corp-dark);
-            padding: 4px 8px;
-            border: 1px solid var(--shadow);
-        }
-
-        /* Status LEDs */
-        .status {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            border: 1px solid #000;
-            box-shadow: inset -2px -2px 2px rgba(0,0,0,0.5);
-            margin-right: 8px;
-        }
-        .status.green { background-color: var(--led-green); }
-        .status.red { background-color: var(--led-red); }
-
-        /* Footer */
-        footer {
-            padding: 0.5rem 2rem;
-            border-top: 2px solid var(--corp-dark);
-            background-color: var(--corp-panel);
+        /* Bin/Grid layout at the bottom */
+        .ui-footer {
             display: flex;
-            gap: 1.5rem;
-            font-size: 0.85rem;
-            font-weight: bold;
-            box-shadow: inset 0px 2px 0px var(--highlight);
+            justify-content: space-between;
+            margin-top: 20px;
+            border-top: 2px solid var(--phosphor-cyan);
+            padding-top: 10px;
+            z-index: 5;
+            position: relative;
         }
 
-        footer span { cursor: pointer; color: var(--corp-blue); }
-        footer span:hover { text-decoration: underline; }
+        .data-bin {
+            border: 2px solid var(--phosphor-cyan);
+            padding: 5px 20px;
+            text-align: center;
+        }
+
+        .status-alert { color: var(--phosphor-alert); text-shadow: 0 0 5px var(--phosphor-alert); }
+        .key-mask { opacity: 0.7; letter-spacing: 2px; }
+
     </style>
 </head>
 <body>
 
-    <div class="terminal-casing">
-        <header>
-            <div class="logo">
-                🛡️ AGENT BADGE
+    <div class="hardware-case">
+        <div class="hardware-bezel">
+            <div class="crt-screen">
+                
+                <div class="ui-header">
+                    <div class="header-box">AGENT BADGE</div>
+                    <div class="progress-track">
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment"></div>
+                        <div class="progress-segment empty"></div>
+                        <div class="progress-segment empty"></div>
+                        <div style="margin-left: 10px;">82% SECURE</div>
+                    </div>
+                    <div class="corp-logo">ACME CORP</div>
+                </div>
+
+                <div class="main-content">
+                    
+                    <nav>
+                        <button class="action" onclick="alert('0x00A1: INITIATING PROTOCOL')">INITIALIZE</button>
+                        <button class="active" onclick="switchView('agents', this)">AGENTS</button>
+                        <button onclick="switchView('vaults', this)">VAULTS</button>
+                        <button onclick="switchView('activity', this)">AUDIT LOG</button>
+                    </nav>
+
+                    <div class="workspace">
+                        
+                        <div id="agents" class="view active">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>STATUS</th>
+                                        <th>IDENTIFIER</th>
+                                        <th>KEY_DATA</th>
+                                        <th>CLEARANCE</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>[ ACTIVE ]</td>
+                                        <td>SCRAPER_ALPHA</td>
+                                        <td class="key-mask">AK_••••8X9Q</td>
+                                        <td>MKT_VAULT</td>
+                                    </tr>
+                                    <tr>
+                                        <td>[ ACTIVE ]</td>
+                                        <td>SUPPORT_SYS</td>
+                                        <td class="key-mask">AK_••••2M4Z</td>
+                                        <td>CORE_DB</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="status-alert">[ SEVERED ]</td>
+                                        <td class="status-alert">TEST_01</td>
+                                        <td class="key-mask status-alert">AK_••••0P1L</td>
+                                        <td class="status-alert">NULL</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="vaults" class="view">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>VAULT_NODE</th>
+                                        <th>CRED_IDENTITY</th>
+                                        <th>LAST_HANDSHAKE</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>STRIPE_PRD</td>
+                                        <td>FINANCE@ACME.COM</td>
+                                        <td>NULL</td>
+                                    </tr>
+                                    <tr>
+                                        <td>X_SOCIAL</td>
+                                        <td>@ACMECORP</td>
+                                        <td>SCRAPER_ALPHA (02H)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ZENDESK_ADM</td>
+                                        <td>API@ACME.COM</td>
+                                        <td>SUPPORT_SYS (10M)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="activity" class="view">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>SYS_TIME</th>
+                                        <th>AGENT</th>
+                                        <th>TARGET</th>
+                                        <th>RESULT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>14:58:12</td>
+                                        <td>SUPPORT_SYS</td>
+                                        <td>ZENDESK_ADM</td>
+                                        <td>SUCCESS</td>
+                                    </tr>
+                                    <tr>
+                                        <td>14:22:05</td>
+                                        <td>SCRAPER_ALPHA</td>
+                                        <td>X_SOCIAL</td>
+                                        <td>SUCCESS</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="status-alert">09:15:44</td>
+                                        <td class="status-alert">TEST_01</td>
+                                        <td class="status-alert">STRIPE_PRD</td>
+                                        <td class="status-alert">ACCESS_DENIED</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="ui-footer">
+                    <div class="data-bin">SYS_01<br>OK</div>
+                    <div class="data-bin">SYS_02<br>OK</div>
+                    <div class="data-bin">SYS_03<br>OK</div>
+                    <div class="data-bin">SYS_04<br>WARN</div>
+                    <div class="data-bin">SYS_05<br>OK</div>
+                    <div style="align-self: flex-end;">0x137056 : 0x09B32E</div>
+                </div>
+
             </div>
-            <div class="org-tag">[ORG: ACME CORP]</div>
-        </header>
-
-        <div class="main-layout">
-            <aside>
-                <button class="skeuo-btn primary" onclick="alert('Initializing Key Generation Protocol...')">INITIALIZE AGENT</button>
-                <button class="skeuo-btn active" onclick="switchView('agents', this)">AGENTS</button>
-                <button class="skeuo-btn" onclick="switchView('vaults', this)">VAULTS</button>
-                <button class="skeuo-btn" onclick="switchView('activity', this)">ACTIVITY</button>
-            </aside>
-
-            <main>
-                <div id="agents" class="view active">
-                    <h2>Registered Agents</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Agent Identifier</th>
-                                <th>Assigned Key (Masked)</th>
-                                <th>Vault Access</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><span class="status green"></span> Active</td>
-                                <td>ScraperBot-Alpha</td>
-                                <td><span class="code-block">ak_live_••••••••8x9q</span></td>
-                                <td>Marketing Passwords</td>
-                            </tr>
-                            <tr>
-                                <td><span class="status green"></span> Active</td>
-                                <td>Support-Responder</td>
-                                <td><span class="code-block">ak_live_••••••••2m4z</span></td>
-                                <td>Zendesk Core</td>
-                            </tr>
-                            <tr>
-                                <td><span class="status red"></span> Revoked</td>
-                                <td>Test-Agent-01</td>
-                                <td><span class="code-block">ak_test_••••••••0p1l</span></td>
-                                <td>None</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="vaults" class="view">
-                    <h2>Connected Vaults [1Password Auth]</h2>
-                    <table style="margin-bottom: 1rem;">
-                        <thead>
-                            <tr>
-                                <th>Site Name</th>
-                                <th>Username / Identity</th>
-                                <th>Last Accessed By Agent</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Stripe Dashboard</td>
-                                <td>finance@acmecorp.com</td>
-                                <td>Never</td>
-                            </tr>
-                            <tr>
-                                <td>X (Twitter)</td>
-                                <td>@AcmeCorp</td>
-                                <td>ScraperBot-Alpha (2 hrs ago)</td>
-                            </tr>
-                            <tr>
-                                <td>Zendesk Admin</td>
-                                <td>support-api@acmecorp.com</td>
-                                <td>Support-Responder (10 mins ago)</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <button class="skeuo-btn">ADD CREDENTIAL ENTRY</button>
-                </div>
-
-                <div id="activity" class="view">
-                    <h2>Real-Time Audit Trail</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Agent</th>
-                                <th>Target Site</th>
-                                <th>Action</th>
-                                <th>Resolution</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>14:58:12 PST</td>
-                                <td>Support-Responder</td>
-                                <td>Zendesk Admin</td>
-                                <td>AUTH_REQUEST</td>
-                                <td><span class="status green"></span> SUCCESS</td>
-                            </tr>
-                            <tr>
-                                <td>14:22:05 PST</td>
-                                <td>ScraperBot-Alpha</td>
-                                <td>X (Twitter)</td>
-                                <td>AUTH_REQUEST</td>
-                                <td><span class="status green"></span> SUCCESS</td>
-                            </tr>
-                            <tr>
-                                <td>09:15:44 PST</td>
-                                <td>Test-Agent-01</td>
-                                <td>Stripe Dashboard</td>
-                                <td>AUTH_REQUEST</td>
-                                <td><span class="status red"></span> DENIED (Revoked)</td>
-                            </tr>
-                            <tr>
-                                <td>09:12:01 PST</td>
-                                <td>Admin User</td>
-                                <td>System</td>
-                                <td>KEY_REVOKE</td>
-                                <td><span class="status green"></span> SUCCESS</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </main>
         </div>
-
-        <footer>
-            <span>Docs</span> •
-            <span>Settings</span> •
-            <span>System Status: Optimal</span>
-        </footer>
     </div>
 
     <script>
         function switchView(viewId, btnElement) {
-            // Hide all views
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-            // Remove active state from all buttons (except primary)
-            document.querySelectorAll('.skeuo-btn:not(.primary)').forEach(el => el.classList.remove('active'));
-
-            // Show target view
+            document.querySelectorAll('nav button:not(.action)').forEach(el => el.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
-            // Depress the clicked button
             btnElement.classList.add('active');
         }
     </script>
