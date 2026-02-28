@@ -3,7 +3,7 @@
   line-height: 1.5;
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #c5d0cf;
 }
 body {
   margin: 0;
@@ -12,18 +12,6 @@ body {
   min-width: 320px;
   min-height: 100vh;
   position: relative;
-}
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.05;
-  background: url("./logo.svg");
-  background-size: 256px;
-  transform: rotate(-12deg) scale(1.35);
-  animation: slide 30s linear infinite;
-  pointer-events: none;
 }
 @keyframes slide {
   from {
@@ -49,13 +37,9 @@ body::before {
   margin-bottom: 2rem;
 }
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 0.3s;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+  height: 60vh;
+  max-width: 100%;
+  object-fit: contain;
 }
 .bun-logo {
   transform: scale(1.2);
