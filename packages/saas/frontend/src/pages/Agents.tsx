@@ -357,6 +357,236 @@ function TerminalDialog({
   );
 }
 
+function EngraverDialog({
+  agent,
+  onClose,
+}: {
+  agent: Agent;
+  onClose: () => void;
+}) {
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const gantryRef = useRef<HTMLDivElement>(null);
+  const laserHeadRef = useRef<HTMLDivElement>(null);
+  const laserBeamRef = useRef<HTMLDivElement>(null);
+  const printedDataRef = useRef<HTMLDivElement>(null);
+  const pistonRef = useRef<HTMLDivElement>(null);
+  const holeRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<"ready" | "running" | "done">("ready");
+
+  const appendLog = useCallback((msg: string) => {
+    if (!logRef.current) return;
+    logRef.current.innerHTML += `<br>> ${msg}`;
+    logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, []);
+
+  const startLaserSound = useCallback(() => {
+    const ctx = new AudioContext();
+    // High-pitched sine for the laser hum
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = 2200;
+    // Slight modulation for scanning feel
+    const lfo = ctx.createOscillator();
+    lfo.type = "triangle";
+    lfo.frequency.value = 8;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 200;
+    lfo.connect(lfoGain).connect(osc.frequency);
+    // Subtle noise layer
+    const bufferSize = ctx.sampleRate * 5;
+    const noiseBuf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuf;
+    noise.loop = true;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = "highpass";
+    noiseFilter.frequency.value = 3000;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.04;
+    noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
+    const master = ctx.createGain();
+    master.gain.value = 0.08;
+    osc.connect(master).connect(ctx.destination);
+    osc.start();
+    lfo.start();
+    noise.start();
+    return () => {
+      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+      noiseGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+      setTimeout(() => { osc.stop(); lfo.stop(); noise.stop(); ctx.close(); }, 300);
+    };
+  }, []);
+
+  const playStampSound = useCallback(() => {
+    const ctx = new AudioContext();
+    // Low thud
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(100, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.15);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    // Impact noise burst
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.03));
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = buf;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.3;
+    noiseSrc.connect(noiseGain).connect(ctx.destination);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    noiseSrc.start();
+    osc.stop(ctx.currentTime + 0.4);
+    setTimeout(() => ctx.close(), 500);
+  }, []);
+
+  const startIssuance = useCallback(() => {
+    if (phase !== "ready") return;
+    setPhase("running");
+    const badge = badgeRef.current!;
+    const gantry = gantryRef.current!;
+    const laserBeam = laserBeamRef.current!;
+    const laserHead = laserHeadRef.current!;
+    const printedData = printedDataRef.current!;
+    const piston = pistonRef.current!;
+    const hole = holeRef.current!;
+
+    logRef.current!.innerHTML = "> PROTOCOL INITIATED.";
+
+    // Phase 1: Load blank
+    setTimeout(() => {
+      appendLog("LOADING BLANK MEDIA...");
+      badge.style.transform = "translateY(0) scale(1)";
+      badge.style.opacity = "1";
+    }, 500);
+
+    // Phase 2: Laser engraving
+    setTimeout(() => {
+      appendLog("ENGAGING UV RESIN LASER...");
+      gantry.style.display = "flex";
+      gantry.style.top = "10%";
+      laserBeam.style.opacity = "1";
+      laserHead.style.animation = "engraver-scan-x 0.15s infinite alternate ease-in-out";
+
+      const stopLaser = startLaserSound();
+
+      let progress = 10;
+      function scanDown() {
+        progress += 0.4;
+        gantry.style.top = `${progress}%`;
+        printedData.style.clipPath = `inset(0 0 ${100 - progress}% 0)`;
+        if (progress < 90) {
+          requestAnimationFrame(scanDown);
+        } else {
+          // Phase 3: finish scan
+          stopLaser();
+          laserBeam.style.opacity = "0";
+          laserHead.style.animation = "none";
+          gantry.style.display = "none";
+          appendLog("CURING COMPLETE. ALIGNING STAMP...");
+          setTimeout(stampHole, 800);
+        }
+      }
+      requestAnimationFrame(scanDown);
+    }, 1500);
+
+    // Phase 4: Hydraulic punch
+    function stampHole() {
+      piston.style.opacity = "1";
+      requestAnimationFrame(() => {
+        piston.style.transform = "translateX(-50%) translateY(0px) scale(1.1)";
+        setTimeout(() => {
+          playStampSound();
+          hole.style.opacity = "1";
+          appendLog("LANYARD APERTURE PUNCHED.");
+          // Screen shake
+          const scene = badge.closest(".engraver-scene") as HTMLElement;
+          if (scene) {
+            scene.style.transform = "translateY(5px)";
+            setTimeout(() => { scene.style.transform = ""; }, 50);
+          }
+          // Piston retracts
+          piston.style.transition = "transform 0.5s ease-out";
+          piston.style.transform = "translateX(-50%) translateY(-100px) scale(0.8)";
+          setTimeout(finalize, 600);
+        }, 150);
+      });
+    }
+
+    // Phase 5: Present badge
+    function finalize() {
+      piston.style.opacity = "0";
+      badge.style.boxShadow = "inset 2px 2px 4px #fff, inset -2px -2px 6px var(--cream-shadow), 15px 15px 30px rgba(0,0,0,0.8)";
+      badge.style.transform = "translateY(-5px) scale(1.02)";
+      appendLog("BADGE ISSUED SUCCESSFULLY.");
+      setPhase("done");
+    }
+  }, [phase, appendLog, startLaserSound, playStampSound]);
+
+  const status = computeStatus(agent.lastActivityAt, agent.expiresAt);
+
+  return (
+    <div className="engraver-backdrop">
+      <div className="engraver-scene">
+        <div className="engraver-machine-tray">
+          <div className="engraver-tray-bed">
+            <div className="engraver-badge-base" ref={badgeRef}>
+              <div className="engraver-mag-stripe" />
+              <div className="engraver-punch-hole" ref={holeRef} />
+              <div className="engraver-printed-data" ref={printedDataRef}>
+                <div className="destructor-agent-name">{agent.name}</div>
+                <div className="destructor-data-row"><span style={{ color: "#666" }}>CLEARANCE</span> <span>{agent.linkedCredentials.length > 0 ? `LVL_01 (${agent.linkedCredentials.length} VAULT${agent.linkedCredentials.length > 1 ? "S" : ""})` : "NONE"}</span></div>
+                <div className="destructor-data-row"><span style={{ color: "#666" }}>KEY_SIG</span> <span>{maskKey(agent.apiKey)}</span></div>
+                <div className="destructor-data-row" style={{ marginTop: 20, borderTop: "1px dashed #ccc", paddingTop: 15 }}>
+                  <span style={{ color: "#666" }}>STATUS</span>
+                  <span style={{ color: status.color, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 8, height: 8, background: status.color, borderRadius: "50%", boxShadow: "inset 1px 1px 2px rgba(0,0,0,0.5)", display: "inline-block" }} /> {status.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="engraver-gantry" ref={gantryRef}>
+              <div className="engraver-laser-head" ref={laserHeadRef}>
+                <div className="engraver-laser-beam" ref={laserBeamRef} />
+              </div>
+            </div>
+
+            <div className="engraver-piston" ref={pistonRef} />
+          </div>
+        </div>
+
+        <div className="engraver-controls">
+          <div className="engraver-sys-log" ref={logRef}>{"> SYSTEM READY."}<br />{"> AWAITING ISSUANCE PROTOCOL."}</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            {phase !== "running" && (
+              <button className="row-action-btn" onClick={onClose}>
+                {phase === "done" ? "Close" : "Cancel"}
+              </button>
+            )}
+            {phase === "ready" && (
+              <button className="engraver-issue-btn" onClick={startIssuance}>
+                Initialize Resin Engraver
+              </button>
+            )}
+            {phase === "done" && (
+              <button className="engraver-issue-btn" onClick={onClose}>
+                Badge Ready for Agent
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DestructorDialog({
   agent,
   onConfirm,
@@ -391,10 +621,46 @@ function DestructorDialog({
     }).onfinish = () => debris.remove();
   }, []);
 
+  const startShredSound = useCallback(() => {
+    const ctx = new AudioContext();
+    // White noise buffer for the shredding texture
+    const bufferSize = ctx.sampleRate * 10;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+    // Bandpass filter to make it sound more mechanical
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 800;
+    filter.Q.value = 0.8;
+    // Low grinding oscillator
+    const grind = ctx.createOscillator();
+    grind.type = "sawtooth";
+    grind.frequency.value = 42;
+    const grindGain = ctx.createGain();
+    grindGain.gain.value = 0.15;
+    // Master gain
+    const master = ctx.createGain();
+    master.gain.value = 0.25;
+    noise.connect(filter).connect(master);
+    grind.connect(grindGain).connect(master);
+    master.connect(ctx.destination);
+    noise.start();
+    grind.start();
+    return () => {
+      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+      setTimeout(() => { noise.stop(); grind.stop(); ctx.close(); }, 400);
+    };
+  }, []);
+
   const engage = useCallback(() => {
     const badge = badgeRef.current;
     if (!badge || shredding) return;
     setShredding(true);
+    const stopSound = startShredSound();
     let depth = 0;
     badge.style.animation = "destructor-shake 0.08s infinite";
     const interval = setInterval(() => {
@@ -403,13 +669,14 @@ function DestructorDialog({
       if (depth % 6 === 0) spawnDebris();
       if (depth > 380) {
         clearInterval(interval);
+        stopSound();
         badge.style.display = "none";
         setShredding(false);
         onConfirm();
         setTimeout(onClose, 400);
       }
     }, 20);
-  }, [shredding, spawnDebris, onConfirm, onClose]);
+  }, [shredding, spawnDebris, startShredSound, onConfirm, onClose]);
 
   const status = computeStatus(agent.lastActivityAt, agent.expiresAt);
 
@@ -459,6 +726,7 @@ export default function Agents() {
   const [editName, setEditName] = useState("");
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [destructorAgent, setDestructorAgent] = useState<Agent | null>(null);
+  const [engraverAgent, setEngraverAgent] = useState<Agent | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchAgents = async () => {
@@ -480,14 +748,27 @@ export default function Agents() {
 
   const createAgent = async () => {
     if (!name.trim()) return;
-    await fetch(`${API}/agents`, {
+    const res = await fetch(`${API}/agents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim(), description: description.trim() }),
     });
-    setName("");
-    setDescription("");
-    fetchAgents();
+    if (res.ok) {
+      const raw = await res.json();
+      const created: Agent = {
+        ...raw,
+        lastActivityAt: raw.lastActivityAt ?? null,
+        recentActivity: raw.recentActivity ?? [],
+        deniedCount: raw.deniedCount ?? 0,
+        linkedCredentials: raw.linkedCredentials ?? [],
+        linkedOAuthConnections: raw.linkedOAuthConnections ?? [],
+        mailboxAddress: raw.mailboxAddress ?? null,
+      };
+      setName("");
+      setDescription("");
+      fetchAgents();
+      setEngraverAgent(created);
+    }
   };
 
   const updateAgent = async (id: string) => {
@@ -783,6 +1064,13 @@ export default function Agents() {
 
       {agents.length === 0 && (
         <div className="empty-state">NO BADGES ISSUED // USE FORM ABOVE TO REGISTER AN AGENT</div>
+      )}
+
+      {engraverAgent && (
+        <EngraverDialog
+          agent={engraverAgent}
+          onClose={() => setEngraverAgent(null)}
+        />
       )}
 
       {destructorAgent && (

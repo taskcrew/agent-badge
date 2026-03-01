@@ -1168,3 +1168,175 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
   pointer-events: none;
   opacity: 0;
 }
+
+/* --- ENGRAVER DIALOG --- */
+.engraver-backdrop {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(2, 12, 23, 0.9);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.engraver-scene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.engraver-machine-tray {
+  background: #12181d;
+  width: 380px; height: 500px;
+  border-radius: 12px;
+  border: 4px solid #000;
+  box-shadow: inset 5px 5px 20px rgba(0,0,0,0.9), 0 20px 50px rgba(0,0,0,0.8);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.engraver-tray-bed {
+  width: 300px; height: 420px;
+  background: #080b0e;
+  border-radius: 10px;
+  box-shadow: inset 0 0 15px #000;
+  position: relative;
+}
+
+.engraver-badge-base {
+  position: absolute;
+  top: 10px; left: 10px; right: 10px; bottom: 10px;
+  background-color: var(--cream-base);
+  border-radius: 6px;
+  box-shadow: inset 2px 2px 4px #fff, inset -2px -2px 6px var(--cream-shadow), 5px 5px 15px rgba(0,0,0,0.5);
+  transform: translateY(20px) scale(0.95);
+  opacity: 0.5;
+  transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.engraver-mag-stripe {
+  position: absolute;
+  top: 40px; width: 100%; height: 30px;
+  background: repeating-linear-gradient(90deg, #b0bfc6, #b0bfc6 2px, #cdd5d9 2px, #cdd5d9 4px);
+  opacity: 0.3;
+}
+
+.engraver-printed-data {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  padding: 90px 20px 20px;
+  color: var(--ink-dark);
+  clip-path: inset(0 0 100% 0);
+  z-index: 5;
+}
+
+.engraver-punch-hole {
+  position: absolute;
+  top: 20px; left: 50%; transform: translateX(-50%);
+  width: 50px; height: 12px;
+  background: #080b0e;
+  border-radius: 6px;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9), 0px 1px 0px rgba(255,255,255,0.8);
+  opacity: 0;
+}
+
+/* Gantry & Laser */
+.engraver-gantry {
+  position: absolute;
+  left: 0; width: 100%; height: 30px;
+  background: linear-gradient(to bottom, #2c363f, #12181d);
+  border-top: 2px solid #555;
+  border-bottom: 4px solid #000;
+  top: 0%;
+  z-index: 10;
+  box-shadow: 0 15px 20px rgba(0,0,0,0.8);
+  display: none;
+  align-items: center;
+}
+
+.engraver-laser-head {
+  width: 20px; height: 15px;
+  background: #111;
+  border: 2px solid #333;
+  border-radius: 4px;
+  position: absolute;
+  left: 5%;
+  transition: left 0.1s linear;
+}
+
+.engraver-laser-beam {
+  position: absolute;
+  top: 100%; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 15px;
+  background: var(--sys-cyan);
+  opacity: 0;
+  box-shadow: 0 0 15px var(--sys-cyan), 0 0 30px var(--sys-cyan);
+  border-radius: 0 0 50% 50%;
+}
+
+@keyframes engraver-scan-x {
+  0% { left: 5%; }
+  100% { left: 88%; }
+}
+
+/* Piston */
+.engraver-piston {
+  position: absolute;
+  top: 15px; left: 50%;
+  transform: translateX(-50%) translateY(-50px);
+  width: 70px; height: 70px;
+  background: radial-gradient(circle, #2c363f 40%, #000 100%);
+  border-radius: 50%;
+  border: 4px solid #111;
+  z-index: 20;
+  box-shadow: 0 20px 30px rgba(0,0,0,0.9);
+  transition: transform 0.15s cubic-bezier(0.5, 0, 1, 1);
+  opacity: 0;
+}
+
+/* Controls */
+.engraver-controls {
+  margin-top: 20px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.engraver-sys-log {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--sys-cyan);
+  padding: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  text-align: left;
+  height: 60px;
+  overflow-y: auto;
+  color: var(--sys-cyan);
+}
+
+.engraver-issue-btn {
+  background: var(--cream-base);
+  color: var(--ink-dark);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  padding: 15px 30px;
+  border: none;
+  cursor: pointer;
+  box-shadow: inset 2px 2px 0px #fff, inset -4px -4px 0px var(--cream-shadow), 0 5px 15px rgba(0,0,0,0.5);
+  transition: all 0.1s;
+}
+
+.engraver-issue-btn:active {
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.4);
+  transform: translateY(2px);
+}
