@@ -288,6 +288,75 @@ function RecentActivityFeed({ activity }: { activity: RecentActivityEntry[] }) {
   );
 }
 
+interface DialogState {
+  type: "confirm" | "alert";
+  variant?: "delete";
+  title: string;
+  message: string;
+  content?: string;
+  onConfirm: () => void;
+}
+
+function TerminalDialog({
+  dialog,
+  onClose,
+}: {
+  dialog: DialogState;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleConfirm = () => {
+    dialog.onConfirm();
+    onClose();
+  };
+
+  const handleCopy = async () => {
+    if (dialog.content) {
+      await navigator.clipboard.writeText(dialog.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="term-dialog-backdrop" onClick={onClose}>
+      <div
+        className={`term-dialog${dialog.variant === "delete" ? " delete" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="term-dialog-title">{dialog.title}</div>
+        <div className="term-dialog-message">{dialog.message}</div>
+        {dialog.content && (
+          <div className="term-dialog-content">{dialog.content}</div>
+        )}
+        <div className="term-dialog-actions">
+          {dialog.type === "confirm" ? (
+            <>
+              <button className="row-action-btn" onClick={onClose}>Cancel</button>
+              <button
+                className={`row-action-btn${dialog.variant === "delete" ? " delete" : ""}`}
+                onClick={handleConfirm}
+              >
+                Confirm
+              </button>
+            </>
+          ) : (
+            <>
+              {dialog.content && (
+                <button className="row-action-btn" onClick={handleCopy}>
+                  {copied ? "Copied" : "Copy Key"}
+                </button>
+              )}
+              <button className="row-action-btn" onClick={onClose}>Close</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -296,6 +365,7 @@ export default function Agents() {
   const [description, setDescription] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [dialog, setDialog] = useState<DialogState | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchAgents = async () => {
@@ -339,20 +409,39 @@ export default function Agents() {
     fetchAgents();
   };
 
-  const deleteAgent = async (id: string) => {
-    if (!confirm("Delete this agent? All linked credentials, OAuth connections, and mailbox will be unlinked.")) return;
-    await fetch(`${API}/agents/${id}`, { method: "DELETE" });
-    fetchAgents();
+  const deleteAgent = (id: string) => {
+    setDialog({
+      type: "confirm",
+      variant: "delete",
+      title: "Delete Agent",
+      message: "Delete this agent? All linked credentials, OAuth connections, and mailbox will be unlinked.",
+      onConfirm: async () => {
+        await fetch(`${API}/agents/${id}`, { method: "DELETE" });
+        fetchAgents();
+      },
+    });
   };
 
-  const rotateKey = async (id: string) => {
-    if (!confirm("Rotate API key? The current key will stop working immediately.")) return;
-    const res = await fetch(`${API}/agents/${id}/rotate-key`, { method: "PATCH" });
-    if (res.ok) {
-      const updated = await res.json();
-      alert(`New API key:\n${updated.apiKey}\n\nCopy this now — it won't be shown again.`);
-      fetchAgents();
-    }
+  const rotateKey = (id: string) => {
+    setDialog({
+      type: "confirm",
+      title: "Rotate Key",
+      message: "Rotate API key? The current key will stop working immediately.",
+      onConfirm: async () => {
+        const res = await fetch(`${API}/agents/${id}/rotate-key`, { method: "PATCH" });
+        if (res.ok) {
+          const updated = await res.json();
+          setDialog({
+            type: "alert",
+            title: "Key Rotated",
+            message: "Copy this now — it won't be shown again.",
+            content: updated.apiKey,
+            onConfirm: () => {},
+          });
+          fetchAgents();
+        }
+      },
+    });
   };
 
   const linkCredential = async (agentId: string, credentialId: string) => {
@@ -605,6 +694,10 @@ export default function Agents() {
 
       {agents.length === 0 && (
         <div className="empty-state">NO BADGES ISSUED // USE FORM ABOVE TO REGISTER AN AGENT</div>
+      )}
+
+      {dialog && (
+        <TerminalDialog dialog={dialog} onClose={() => setDialog(null)} />
       )}
     </>
   );

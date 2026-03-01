@@ -782,6 +782,76 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
 }
 
 /* --- 1PASSWORD BADGE --- */
+/* --- TERMINAL DIALOG --- */
+.term-dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(2, 12, 23, 0.8);
+  backdrop-filter: blur(5px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.term-dialog {
+  border: 2px solid var(--sys-cyan-dim);
+  background: var(--bg-deep);
+  padding: 24px 28px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 0 40px rgba(77, 243, 255, 0.15);
+}
+
+.term-dialog.delete {
+  border-color: var(--alert-red);
+  box-shadow: 0 0 40px rgba(255, 77, 77, 0.1);
+}
+
+.term-dialog-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--sys-cyan);
+  margin-bottom: 14px;
+}
+
+.term-dialog.delete .term-dialog-title {
+  color: var(--alert-red);
+}
+
+.term-dialog-message {
+  font-size: 0.85rem;
+  color: var(--sys-cyan-dim);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.term-dialog-content {
+  background: rgba(77, 243, 255, 0.05);
+  border: 1px solid var(--sys-cyan-dim);
+  padding: 10px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--sys-cyan);
+  word-break: break-all;
+  margin-bottom: 20px;
+  user-select: all;
+}
+
+.term-dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* --- 1PASSWORD BADGE --- */
 .onepass-badge {
   border: 1px solid var(--sys-cyan);
   padding: 3px 10px;
