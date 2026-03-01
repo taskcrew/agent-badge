@@ -186,7 +186,8 @@ app.get("/login", (c) => {
       </div>
       <button type="submit" class="btn-primary">Sign in</button>
     </form>
-    <div style="text-align:center;margin-top:20px;font-size:13px;color:#64748b;">
+    <div style="text-align:center;margin-top:20px;font-size:13px;color:#64748b;display:flex;flex-direction:column;gap:8px;align-items:center;">
+      <a href="/login/totp" style="color:#6c63ff;text-decoration:none;font-weight:500;">Sign in with verification code</a>
       <a href="/login/google" style="color:#6c63ff;text-decoration:none;font-weight:500;">Sign in with Google instead</a>
     </div>
   </div>
@@ -195,34 +196,81 @@ app.get("/login", (c) => {
 </html>`);
 });
 
-// --- Login POST ---
+// --- Login POST (password only — no OTP) ---
 app.post("/login", async (c) => {
   const body = await c.req.parseBody();
   const email = body.email as string;
   const password = body.password as string;
 
   if (await validatePassword(password)) {
-    // Generate OTP and store it
-    const otpToken = crypto.randomUUID();
-    const otp = generateOtp();
-    pendingOtps.set(otpToken, { email, otp, createdAt: Date.now() });
-
-    // Send OTP email
-    await sendOtpEmail(email, otp);
-
-    // Set a temporary cookie and redirect to verification page
-    setCookie(c, "crm_otp_token", otpToken, { path: "/", httpOnly: true, maxAge: 300 });
-    return c.redirect("/login/verify");
+    const sessionId = crypto.randomUUID();
+    sessions.set(sessionId, { email, createdAt: Date.now() });
+    setCookie(c, "crm_session", sessionId, { path: "/", httpOnly: true, maxAge: 86400 });
+    return c.redirect("/contacts");
   }
 
   return c.redirect("/login?error=1");
 });
 
-// --- OTP Verification page ---
-app.get("/login/verify", (c) => {
+// --- TOTP login page (email + password, then OTP) ---
+app.get("/login/totp", (c) => {
+  const error = c.req.query("error");
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login - NexusCRM</title><style>${css}</style></head>
+<body>
+<div class="login-container">
+  <div class="login-card">
+    <div class="brand">
+      <h1>Nexus<span>CRM</span></h1>
+      <p>Sign in with email verification</p>
+    </div>
+    ${error ? '<div class="error-msg">Invalid email or password. Please try again.</div>' : ""}
+    <form method="POST" action="/login/totp">
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary">Continue</button>
+    </form>
+    <div style="text-align:center;margin-top:20px;font-size:13px;color:#64748b;">
+      <a href="/login" style="color:#6c63ff;text-decoration:none;font-weight:500;">Sign in with password only</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>`);
+});
+
+// --- TOTP login POST (validate password, send OTP) ---
+app.post("/login/totp", async (c) => {
+  const body = await c.req.parseBody();
+  const email = body.email as string;
+  const password = body.password as string;
+
+  if (await validatePassword(password)) {
+    const otpToken = crypto.randomUUID();
+    const otp = generateOtp();
+    pendingOtps.set(otpToken, { email, otp, createdAt: Date.now() });
+
+    await sendOtpEmail(email, otp);
+
+    setCookie(c, "crm_otp_token", otpToken, { path: "/", httpOnly: true, maxAge: 300 });
+    return c.redirect("/login/totp/verify");
+  }
+
+  return c.redirect("/login/totp?error=1");
+});
+
+// --- TOTP verification page ---
+app.get("/login/totp/verify", (c) => {
   const otpToken = getCookie(c, "crm_otp_token");
   if (!otpToken || !pendingOtps.has(otpToken)) {
-    return c.redirect("/login");
+    return c.redirect("/login/totp");
   }
 
   const error = c.req.query("error");
@@ -240,7 +288,7 @@ app.get("/login/verify", (c) => {
       We sent a 6-digit code to your email address. Enter it below to complete sign-in.
     </p>
     ${error ? '<div class="error-msg">Invalid or expired verification code. Please try again.</div>' : ""}
-    <form method="POST" action="/login/verify">
+    <form method="POST" action="/login/totp/verify">
       <div class="form-group">
         <label for="code">Verification code</label>
         <input type="text" id="code" name="code" placeholder="Enter 6-digit code" required autocomplete="one-time-code" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;letter-spacing:8px;font-size:20px;font-weight:600;">
@@ -248,7 +296,7 @@ app.get("/login/verify", (c) => {
       <button type="submit" class="btn-primary">Verify</button>
     </form>
     <div style="text-align:center;margin-top:16px;">
-      <a href="/login" style="color:#6c63ff;text-decoration:none;font-size:13px;font-weight:500;">Back to login</a>
+      <a href="/login/totp" style="color:#6c63ff;text-decoration:none;font-size:13px;font-weight:500;">Back to login</a>
     </div>
   </div>
 </div>
@@ -256,11 +304,11 @@ app.get("/login/verify", (c) => {
 </html>`);
 });
 
-// --- OTP Verification POST ---
-app.post("/login/verify", async (c) => {
+// --- TOTP verification POST ---
+app.post("/login/totp/verify", async (c) => {
   const otpToken = getCookie(c, "crm_otp_token");
   if (!otpToken || !pendingOtps.has(otpToken)) {
-    return c.redirect("/login");
+    return c.redirect("/login/totp");
   }
 
   const body = await c.req.parseBody();
@@ -271,11 +319,11 @@ app.post("/login/verify", async (c) => {
   if (Date.now() - pending.createdAt > 5 * 60 * 1000) {
     pendingOtps.delete(otpToken);
     deleteCookie(c, "crm_otp_token", { path: "/" });
-    return c.redirect("/login?error=1");
+    return c.redirect("/login/totp?error=1");
   }
 
   if (code !== pending.otp) {
-    return c.redirect("/login/verify?error=1");
+    return c.redirect("/login/totp/verify?error=1");
   }
 
   // OTP valid — create session
