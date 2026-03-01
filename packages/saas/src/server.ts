@@ -1,11 +1,20 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { basicAuth } from "hono/basic-auth";
 import { serveStatic } from "hono/bun";
 import agentsRoutes, { authRoute } from "./routes/agents";
 import credentialsRoutes from "./routes/credentials";
 import activityRoutes from "./routes/activity";
 import oauthRoutes from "./routes/oauth";
 import { initDatabase } from "./store";
+
+const DASHBOARD_USER = process.env.DASHBOARD_USER || "admin";
+const DASHBOARD_PASS = process.env.DASHBOARD_PASS;
+
+if (!DASHBOARD_PASS) {
+  console.error("DASHBOARD_PASS env var is required");
+  process.exit(1);
+}
 
 const app = new Hono();
 
@@ -14,6 +23,14 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:5173",
   "https://agent-badge.onrender.com",
 ];
+
+// Basic auth for dashboard — skip for agent API calls and health check
+const auth = basicAuth({ username: DASHBOARD_USER, password: DASHBOARD_PASS });
+app.use("*", async (c, next) => {
+  if (c.req.header("X-Agent-Key")) return next();
+  if (c.req.path === "/api/health") return next();
+  return auth(c, next);
+});
 
 app.use("*", cors({
   origin: (origin) => {
