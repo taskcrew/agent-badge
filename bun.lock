@@ -16,6 +16,7 @@
     "packages/crm-mock": {
       "name": "@agent-badge/crm-mock",
       "dependencies": {
+        "agentmail": "^0.3.5",
         "hono": "^4.0.0",
       },
       "devDependencies": {

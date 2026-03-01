@@ -1,10 +1,58 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { AgentMailClient } from "agentmail";
 
 const app = new Hono();
 
 // --- In-memory session store ---
 const sessions = new Map<string, { email: string; createdAt: number }>();
+
+// --- In-memory OTP store ---
+const pendingOtps = new Map<string, { email: string; otp: string; createdAt: number }>();
+
+// --- AgentMail config for sending OTP emails ---
+const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY || "";
+const OTP_SENDER_INBOX = process.env.OTP_SENDER_INBOX || ""; // e.g. "nexuscrm-noreply@agentmail.to"
+const OTP_RECIPIENT = process.env.OTP_RECIPIENT || ""; // e.g. agent's mailbox address
+
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function sendOtpEmail(recipientEmail: string, otp: string): Promise<boolean> {
+  if (!AGENTMAIL_API_KEY || !OTP_SENDER_INBOX) {
+    console.log(`[OTP] AgentMail not configured. OTP code: ${otp}`);
+    return true; // Still allow flow to continue for testing
+  }
+
+  try {
+    const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
+    const senderInboxId = OTP_SENDER_INBOX.split("@")[0];
+    const recipient = recipientEmail || OTP_RECIPIENT;
+
+    if (!recipient) {
+      console.log(`[OTP] No recipient configured. OTP code: ${otp}`);
+      return true;
+    }
+
+    await client.inboxes.messages.send(senderInboxId, {
+      to: [recipient],
+      subject: "Your NexusCRM verification code",
+      text: `Your verification code is ${otp}\n\nThis code expires in 5 minutes.\n\n— NexusCRM`,
+      html: `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">
+        <h2 style="color:#1a1a2e;">Nexus<span style="color:#6c63ff;">CRM</span></h2>
+        <p>Your verification code is:</p>
+        <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:#6c63ff;margin:20px 0;text-align:center;">${otp}</div>
+        <p style="color:#64748b;font-size:13px;">This code expires in 5 minutes.</p>
+      </div>`,
+    });
+    console.log(`[OTP] Email sent to ${recipient}`);
+    return true;
+  } catch (err) {
+    console.error(`[OTP] Failed to send email:`, err);
+    return false;
+  }
+}
 
 // --- Demo credentials ---
 const VALID_EMAIL = "admin@company.com";
@@ -128,13 +176,90 @@ app.post("/login", async (c) => {
   const password = body.password as string;
 
   if (email === VALID_EMAIL && password === VALID_PASSWORD) {
-    const sessionId = crypto.randomUUID();
-    sessions.set(sessionId, { email, createdAt: Date.now() });
-    setCookie(c, "crm_session", sessionId, { path: "/", httpOnly: true, maxAge: 86400 });
-    return c.redirect("/contacts");
+    // Generate OTP and store it
+    const otpToken = crypto.randomUUID();
+    const otp = generateOtp();
+    pendingOtps.set(otpToken, { email, otp, createdAt: Date.now() });
+
+    // Send OTP email
+    await sendOtpEmail(OTP_RECIPIENT, otp);
+
+    // Set a temporary cookie and redirect to verification page
+    setCookie(c, "crm_otp_token", otpToken, { path: "/", httpOnly: true, maxAge: 300 });
+    return c.redirect("/login/verify");
   }
 
   return c.redirect("/login?error=1");
+});
+
+// --- OTP Verification page ---
+app.get("/login/verify", (c) => {
+  const otpToken = getCookie(c, "crm_otp_token");
+  if (!otpToken || !pendingOtps.has(otpToken)) {
+    return c.redirect("/login");
+  }
+
+  const error = c.req.query("error");
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Verify - NexusCRM</title><style>${css}</style></head>
+<body>
+<div class="login-container">
+  <div class="login-card">
+    <div class="brand">
+      <h1>Nexus<span>CRM</span></h1>
+      <p>Enter verification code</p>
+    </div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:20px;text-align:center;">
+      We sent a 6-digit code to your email address. Enter it below to complete sign-in.
+    </p>
+    ${error ? '<div class="error-msg">Invalid or expired verification code. Please try again.</div>' : ""}
+    <form method="POST" action="/login/verify">
+      <div class="form-group">
+        <label for="code">Verification code</label>
+        <input type="text" id="code" name="code" placeholder="Enter 6-digit code" required autocomplete="one-time-code" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" style="text-align:center;letter-spacing:8px;font-size:20px;font-weight:600;">
+      </div>
+      <button type="submit" class="btn-primary">Verify</button>
+    </form>
+    <div style="text-align:center;margin-top:16px;">
+      <a href="/login" style="color:#6c63ff;text-decoration:none;font-size:13px;font-weight:500;">Back to login</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>`);
+});
+
+// --- OTP Verification POST ---
+app.post("/login/verify", async (c) => {
+  const otpToken = getCookie(c, "crm_otp_token");
+  if (!otpToken || !pendingOtps.has(otpToken)) {
+    return c.redirect("/login");
+  }
+
+  const body = await c.req.parseBody();
+  const code = (body.code as string || "").trim();
+  const pending = pendingOtps.get(otpToken)!;
+
+  // Check expiry (5 minutes)
+  if (Date.now() - pending.createdAt > 5 * 60 * 1000) {
+    pendingOtps.delete(otpToken);
+    deleteCookie(c, "crm_otp_token", { path: "/" });
+    return c.redirect("/login?error=1");
+  }
+
+  if (code !== pending.otp) {
+    return c.redirect("/login/verify?error=1");
+  }
+
+  // OTP valid — create session
+  pendingOtps.delete(otpToken);
+  deleteCookie(c, "crm_otp_token", { path: "/" });
+
+  const sessionId = crypto.randomUUID();
+  sessions.set(sessionId, { email: pending.email, createdAt: Date.now() });
+  setCookie(c, "crm_session", sessionId, { path: "/", httpOnly: true, maxAge: 86400 });
+  return c.redirect("/contacts");
 });
 
 // --- Google Sign-In page ---
