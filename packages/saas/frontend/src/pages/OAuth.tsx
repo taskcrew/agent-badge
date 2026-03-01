@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 
 const API = "";
 
+const ENDPOINTS = [
+  { label: "Authorization", url: "/oauth/authorize" },
+  { label: "Token", url: "/oauth/token" },
+  { label: "UserInfo", url: "/oauth/userinfo" },
+];
+
 interface OAuthConnection {
   id: string;
   provider: string;
@@ -16,6 +22,15 @@ export default function OAuth() {
   const [connections, setConnections] = useState<OAuthConnection[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const baseUrl = window.location.origin;
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 1500);
+  };
 
   const fetchConnections = async () => {
     const res = await fetch(`${API}/oauth/connections`);
@@ -51,16 +66,48 @@ export default function OAuth() {
   return (
     <>
       <div className="term-form">
-        <div className="term-form-title">Connect OAuth Provider</div>
-        <div className="term-form-row">
-          <a
-            href={`${API}/oauth/google/authorize`}
-            className="term-submit"
-            style={{ textDecoration: "none", textAlign: "center" }}
-          >
-            Connect Google Account
-          </a>
+        <div className="term-form-title">Agent Badge OAuth</div>
+        <div style={{ padding: "8px 12px", fontSize: "0.85rem", opacity: 0.7 }}>
+          Let agents authenticate on any site with "Sign in with Agent Badge"
         </div>
+        <div style={{ padding: "4px 12px 12px" }}>
+          <span
+            style={{
+              display: "inline-block",
+              padding: "2px 8px",
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              border: "1px solid var(--accent, #0ff)",
+              color: "var(--accent, #0ff)",
+              borderRadius: "2px",
+            }}
+          >
+            IN DEVELOPMENT
+          </span>
+        </div>
+        <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          {ENDPOINTS.map((ep) => {
+            const fullUrl = `${baseUrl}${ep.url}`;
+            return (
+              <div key={ep.label} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.8rem" }}>
+                <span style={{ width: "100px", opacity: 0.6 }}>{ep.label}</span>
+                <code style={{ flex: 1, fontSize: "0.75rem", opacity: 0.8 }}>{fullUrl}</code>
+                <button
+                  className="row-action-btn"
+                  onClick={() => copyToClipboard(fullUrl, ep.label)}
+                  style={{ fontSize: "0.7rem" }}
+                >
+                  {copied === ep.label ? "Copied" : "Copy"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ margin: "16px 0 8px", fontSize: "0.85rem", fontWeight: 600, letterSpacing: "0.05em" }}>
+        CONNECTED IDENTITY SOURCES
       </div>
 
       <table>
@@ -139,7 +186,7 @@ export default function OAuth() {
 
       {connections.length === 0 && (
         <div className="empty-state">
-          NO OAUTH CONNECTIONS // USE BUTTON ABOVE TO CONNECT A GOOGLE ACCOUNT
+          NO IDENTITY SOURCES CONNECTED // GOOGLE CONNECT COMING SOON
         </div>
       )}
     </>

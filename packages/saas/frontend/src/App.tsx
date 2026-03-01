@@ -7,7 +7,7 @@ import OAuth from "./pages/OAuth";
 const NAV_ITEMS = [
   { id: "agents", label: "Assigned Badges" },
   { id: "vaults", label: "Vault Nodes" },
-  { id: "oauth", label: "OAuth Links" },
+  { id: "oauth", label: "OAuth Provider" },
   { id: "activity", label: "Audit Stream" },
 ] as const;
 
@@ -16,7 +16,7 @@ type Page = (typeof NAV_ITEMS)[number]["id"];
 const VIEW_TITLES: Record<Page, string> = {
   agents: "ASSIGNED BADGES",
   vaults: "VAULT NODES",
-  oauth: "OAUTH LINKS",
+  oauth: "OAUTH PROVIDER",
   activity: "AUDIT STREAM",
 };
 
