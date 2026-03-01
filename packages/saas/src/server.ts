@@ -6,6 +6,7 @@ import agentsRoutes, { authRoute } from "./routes/agents";
 import credentialsRoutes from "./routes/credentials";
 import activityRoutes from "./routes/activity";
 import oauthRoutes from "./routes/oauth";
+import otpRoutes from "./routes/otp";
 import { initDatabase } from "./store";
 
 const DASHBOARD_USER = process.env.DASHBOARD_USER || "admin";
@@ -47,6 +48,7 @@ app.route("/credentials", credentialsRoutes);
 app.route("/auth", authRoute);
 app.route("/activity", activityRoutes);
 app.route("/oauth", oauthRoutes);
+app.route("/otp", otpRoutes);
 
 // Health check
 app.get("/api/health", (c) => c.json({ status: "ok" }));

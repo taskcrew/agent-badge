@@ -124,6 +124,14 @@ export async function initDatabase() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS agent_mailboxes (
+      agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+      inbox_address TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   // Seed demo data if empty
   const agentCount = await sql`SELECT COUNT(*) as count FROM agents`;
   if (Number(agentCount[0].count) === 0) {
@@ -418,4 +426,25 @@ export async function getAgentOAuthLink(agentId: string, oauthConnectionId: stri
     LIMIT 1
   `;
   return rows.length > 0 ? { allowedScopes: rows[0].allowed_scopes as string } : undefined;
+}
+
+// --- Agent Mailbox operations ---
+
+export async function setAgentMailbox(agentId: string, inboxAddress: string): Promise<void> {
+  await sql`
+    INSERT INTO agent_mailboxes (agent_id, inbox_address, created_at)
+    VALUES (${agentId}, ${inboxAddress}, NOW())
+    ON CONFLICT (agent_id) DO UPDATE SET inbox_address = ${inboxAddress}
+  `;
+}
+
+export async function getAgentMailbox(agentId: string): Promise<string | undefined> {
+  const rows = await sql`
+    SELECT inbox_address FROM agent_mailboxes WHERE agent_id = ${agentId} LIMIT 1
+  `;
+  return rows.length > 0 ? (rows[0].inbox_address as string) : undefined;
+}
+
+export async function deleteAgentMailbox(agentId: string): Promise<void> {
+  await sql`DELETE FROM agent_mailboxes WHERE agent_id = ${agentId}`;
 }

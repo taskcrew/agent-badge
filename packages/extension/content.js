@@ -113,6 +113,118 @@
     return { success: true, message: "Logged in successfully." };
   }
 
+  // --- OTP form detection ---
+
+  function hasOtpForm() {
+    const selectors = [
+      'input[autocomplete="one-time-code"]',
+      'input[name*="otp"]',
+      'input[name*="verification"]',
+      'input[name*="token"][type="text"]',
+      'input[name*="token"][type="tel"]',
+      'input[name*="token"][type="number"]',
+      'input[id*="otp"]',
+      'input[type="tel"][maxlength="6"]',
+      'input[type="tel"][maxlength="4"]',
+      'input[type="number"][maxlength="6"]',
+      'input[type="number"][maxlength="4"]',
+    ];
+    for (const sel of selectors) {
+      if (document.querySelector(sel)) return true;
+    }
+
+    // Check for name/id containing "code" but not password-related
+    const codeInputs = document.querySelectorAll('input[name*="code"], input[id*="code"]');
+    for (const input of codeInputs) {
+      const name = (input.name || "").toLowerCase();
+      const id = (input.id || "").toLowerCase();
+      if (name.includes("passcode") || name.includes("password")) continue;
+      if (id.includes("passcode") || id.includes("password")) continue;
+      if (input.type === "hidden") continue;
+      return true;
+    }
+
+    // Detect split-digit inputs (multiple single-char inputs in a row)
+    const singleDigitInputs = document.querySelectorAll(
+      'input[maxlength="1"][type="text"], input[maxlength="1"][type="tel"], input[maxlength="1"][type="number"]'
+    );
+    if (singleDigitInputs.length >= 4 && singleDigitInputs.length <= 8) return true;
+
+    return false;
+  }
+
+  function findOtpInputs() {
+    // Check for split-digit inputs first
+    const singleDigitInputs = document.querySelectorAll(
+      'input[maxlength="1"][type="text"], input[maxlength="1"][type="tel"], input[maxlength="1"][type="number"]'
+    );
+    if (singleDigitInputs.length >= 4 && singleDigitInputs.length <= 8) {
+      return { type: "split", inputs: Array.from(singleDigitInputs) };
+    }
+
+    // Single input field
+    const selectors = [
+      'input[autocomplete="one-time-code"]',
+      'input[name*="otp"]',
+      'input[name*="verification"]',
+      'input[name*="token"][type="text"]',
+      'input[name*="token"][type="tel"]',
+      'input[name*="token"][type="number"]',
+      'input[id*="otp"]',
+      'input[type="tel"][maxlength="6"]',
+      'input[type="tel"][maxlength="4"]',
+      'input[type="number"][maxlength="6"]',
+      'input[type="number"][maxlength="4"]',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) return { type: "single", inputs: [el] };
+    }
+
+    // Code inputs (excluding password-related)
+    const codeInputs = document.querySelectorAll('input[name*="code"], input[id*="code"]');
+    for (const input of codeInputs) {
+      const name = (input.name || "").toLowerCase();
+      const id = (input.id || "").toLowerCase();
+      if (name.includes("passcode") || name.includes("password")) continue;
+      if (id.includes("passcode") || id.includes("password")) continue;
+      if (input.type === "hidden") continue;
+      return { type: "single", inputs: [input] };
+    }
+
+    return null;
+  }
+
+  function fillOtp(code) {
+    const result = findOtpInputs();
+    if (!result) return false;
+
+    if (result.type === "split") {
+      const digits = code.split("");
+      for (let i = 0; i < result.inputs.length && i < digits.length; i++) {
+        setNativeValue(result.inputs[i], digits[i]);
+      }
+    } else {
+      setNativeValue(result.inputs[0], code);
+    }
+    return true;
+  }
+
+  function findOtpSubmitButton() {
+    const result = findOtpInputs();
+    if (!result) return null;
+    const input = result.inputs[0];
+    const form = input.closest("form");
+    const scope = form || document;
+
+    const selectors = ['button[type="submit"]', 'input[type="submit"]', 'button:not([type])'];
+    for (const sel of selectors) {
+      const el = scope.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
   // --- WebMCP tool registration ---
 
   let loginToolRegistered = false;
@@ -435,6 +547,70 @@
     });
   }
 
+  // --- OTP verification tool registration ---
+
+  let otpToolRegistered = false;
+
+  function registerOtpTool() {
+    if (otpToolRegistered) return;
+    if (typeof navigator.modelContext === "undefined") return;
+
+    otpToolRegistered = true;
+    navigator.modelContext.registerTool({
+      name: "verify_otp",
+      description:
+        "Verify OTP/2FA code sent via email. Agent Badge polls the agent's email inbox, " +
+        "extracts the code, and fills it into the page. The OTP never appears in the response.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: []
+      },
+      execute: async () => {
+        if (!hasOtpForm()) {
+          return { result: "No OTP input detected on this page." };
+        }
+
+        // Ask background.js to fetch the OTP from the backend
+        const response = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "FETCH_OTP" }, resolve);
+        });
+
+        if (!response || !response.success) {
+          const reason = response?.error || "Unknown error";
+          return { result: `Failed to fetch OTP: ${reason}` };
+        }
+
+        // Fill OTP into the form
+        const filled = fillOtp(response.otp);
+        if (!filled) {
+          return { result: "Received OTP but could not find input field to fill it into." };
+        }
+
+        // Brief pause for input events to process
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Try to submit
+        const submitBtn = findOtpSubmitButton();
+        if (submitBtn) {
+          submitBtn.click();
+          return { result: "OTP verified and submitted successfully." };
+        }
+
+        const otpResult = findOtpInputs();
+        if (otpResult) {
+          const form = otpResult.inputs[0].closest("form");
+          if (form) {
+            form.requestSubmit?.() ?? form.submit();
+            return { result: "OTP verified and submitted successfully." };
+          }
+        }
+
+        return { result: "OTP filled successfully but no submit button found. The agent may need to click submit." };
+      }
+    });
+  }
+
   // --- Manual test trigger (Ctrl+Shift+L) ---
   document.addEventListener("keydown", async (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === "L") {
@@ -487,12 +663,16 @@
   if (hasGoogleSignIn()) {
     registerGoogleSignInTool();
   }
+  if (hasOtpForm()) {
+    registerOtpTool();
+  }
 
-  // Also watch for dynamically added login forms and Google Sign-In (SPAs)
+  // Also watch for dynamically added login forms, Google Sign-In, and OTP forms (SPAs)
   const observer = new MutationObserver(() => {
     if (hasLoginForm()) registerLoginTool();
     if (hasGoogleSignIn()) registerGoogleSignInTool();
-    if (loginToolRegistered && googleSignInToolRegistered) observer.disconnect();
+    if (hasOtpForm()) registerOtpTool();
+    if (loginToolRegistered && googleSignInToolRegistered && otpToolRegistered) observer.disconnect();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 })();

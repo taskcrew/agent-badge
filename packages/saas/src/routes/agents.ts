@@ -9,6 +9,9 @@ import {
   linkAgentOAuth,
   unlinkAgentOAuth,
   getLinkedOAuthConnections,
+  getAgentMailbox,
+  setAgentMailbox,
+  deleteAgentMailbox,
 } from "../store";
 
 const app = new Hono();
@@ -32,6 +35,7 @@ app.get("/", async (c) => {
       ...agent,
       linkedCredentials: await getLinkedCredentials(agent.id),
       linkedOAuthConnections: await getLinkedOAuthConnections(agent.id),
+      mailboxAddress: (await getAgentMailbox(agent.id)) || null,
     }))
   );
   return c.json(result);
@@ -75,6 +79,33 @@ app.delete("/:id/oauth-links/:oauthConnectionId", async (c) => {
   const oauthConnectionId = c.req.param("oauthConnectionId");
   await unlinkAgentOAuth(agentId, oauthConnectionId);
   return c.json({ unlinked: true });
+});
+
+// POST /agents/:id/mailbox - Create a mailbox for an agent (convenience alias)
+app.post("/:id/mailbox", async (c) => {
+  const agentId = c.req.param("id");
+  const existing = await getAgentMailbox(agentId);
+  if (existing) {
+    return c.json({ inboxAddress: existing });
+  }
+
+  const { AgentMailClient } = await import("agentmail");
+  const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY || "";
+  if (!AGENTMAIL_API_KEY) {
+    return c.json({ error: "AGENTMAIL_API_KEY not configured" }, 500);
+  }
+  const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
+  const inbox = await client.inboxes.create();
+  const inboxAddress = `${inbox.inboxId}@agentmail.to`;
+  await setAgentMailbox(agentId, inboxAddress);
+  return c.json({ inboxAddress }, 201);
+});
+
+// DELETE /agents/:id/mailbox - Remove agent's mailbox
+app.delete("/:id/mailbox", async (c) => {
+  const agentId = c.req.param("id");
+  await deleteAgentMailbox(agentId);
+  return c.json({ deleted: true });
 });
 
 // POST /auth - Validate an agent API key

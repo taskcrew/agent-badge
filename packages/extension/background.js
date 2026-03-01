@@ -35,6 +35,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message.type === "FETCH_OTP") {
+    handleFetchOtp()
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === "GET_STATUS") {
     handleGetStatus()
       .then(sendResponse)
@@ -191,6 +198,45 @@ function extractEmails(obj, result) {
       extractEmails(item, result);
     }
   }
+}
+
+async function handleFetchOtp() {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return { success: false, error: "No API key configured. Open the Agent Badge popup to set one." };
+  }
+
+  // Retry up to 5 times with 3-second intervals (OTP emails may take a few seconds)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+
+    const response = await fetch(`${API_BASE}/otp/fetch`, {
+      method: "POST",
+      headers: {
+        "X-Agent-Key": apiKey,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      return { success: false, error: `Backend returned ${response.status}: ${body}` };
+    }
+
+    const data = await response.json();
+    if (data.success && data.otp) {
+      return data;
+    }
+
+    // If it's not a "not found" error, don't retry
+    if (data.error && !data.error.includes("No OTP email found")) {
+      return data;
+    }
+  }
+
+  return { success: false, error: "No OTP email received after 5 attempts (15 seconds)" };
 }
 
 async function handleLogActivity(action, site) {
