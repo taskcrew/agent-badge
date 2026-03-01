@@ -6,6 +6,7 @@ import {
   getOAuthConnection,
   updateOAuthConnection,
   deleteOAuthConnection,
+  revokeOAuthConnection,
   findAgentByApiKey,
   getAgentOAuthLink,
   logActivity,
@@ -153,12 +154,15 @@ app.patch("/connections/:id", async (c) => {
   return c.json(safe);
 });
 
-// DELETE /oauth/connections/:id — Revoke token at Google + delete from DB
-app.delete("/connections/:id", async (c) => {
+// POST /oauth/connections/:id/revoke — Revoke token at Google, mark as revoked
+app.post("/connections/:id/revoke", async (c) => {
   const id = c.req.param("id");
   const connection = await getOAuthConnection(id);
   if (!connection) {
     return c.json({ error: "Connection not found" }, 404);
+  }
+  if (connection.revoked) {
+    return c.json({ error: "Connection is already revoked" }, 400);
   }
 
   // Best-effort revoke at Google
@@ -173,6 +177,21 @@ app.delete("/connections/:id", async (c) => {
     );
   } catch (_) {
     // Revocation is best-effort
+  }
+
+  await revokeOAuthConnection(id);
+  return c.json({ revoked: true });
+});
+
+// DELETE /oauth/connections/:id — Delete only if already revoked
+app.delete("/connections/:id", async (c) => {
+  const id = c.req.param("id");
+  const connection = await getOAuthConnection(id);
+  if (!connection) {
+    return c.json({ error: "Connection not found" }, 404);
+  }
+  if (!connection.revoked) {
+    return c.json({ error: "Connection must be revoked before it can be deleted" }, 400);
   }
 
   await deleteOAuthConnection(id);
@@ -232,6 +251,11 @@ app.post("/token", async (c) => {
   const connection = await getOAuthConnection(oauthConnectionId);
   if (!connection) {
     return c.json({ error: "OAuth connection not found" }, 404);
+  }
+
+  if (connection.revoked) {
+    await logActivity(agent.id, agent.name, "oauth_token_denied", "google");
+    return c.json({ error: "OAuth connection has been revoked" }, 403);
   }
 
   const refreshToken = await decrypt(

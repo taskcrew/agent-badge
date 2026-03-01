@@ -36,6 +36,7 @@ export interface OAuthConnection {
   encryptedRefreshToken: string;
   encryptionIv: string;
   scopes: string;
+  revoked: boolean;
   createdAt: string;
 }
 
@@ -118,6 +119,11 @@ export async function initDatabase() {
       scopes TEXT NOT NULL DEFAULT 'openid email profile',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+
+  // Migration: add revoked column if missing
+  await sql`
+    ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS revoked BOOLEAN NOT NULL DEFAULT FALSE
   `;
 
   await sql`
@@ -391,6 +397,7 @@ function rowToOAuthConnection(row: Record<string, unknown>): OAuthConnection {
     encryptedRefreshToken: row.encrypted_refresh_token as string,
     encryptionIv: row.encryption_iv as string,
     scopes: row.scopes as string,
+    revoked: row.revoked as boolean,
     createdAt: (row.created_at as Date).toISOString(),
   };
 }
@@ -412,13 +419,14 @@ export async function createOAuthConnection(
 }
 
 export async function listOAuthConnections(): Promise<Omit<OAuthConnection, "encryptedRefreshToken" | "encryptionIv">[]> {
-  const rows = await sql`SELECT id, provider, label, google_email, scopes, created_at FROM oauth_connections ORDER BY created_at`;
+  const rows = await sql`SELECT id, provider, label, google_email, scopes, revoked, created_at FROM oauth_connections ORDER BY created_at`;
   return rows.map((row) => ({
     id: row.id as string,
     provider: row.provider as string,
     label: row.label as string,
     googleEmail: row.google_email as string,
     scopes: row.scopes as string,
+    revoked: row.revoked as boolean,
     createdAt: (row.created_at as Date).toISOString(),
   }));
 }
@@ -430,6 +438,14 @@ export async function getOAuthConnection(id: string): Promise<OAuthConnection | 
 
 export async function deleteOAuthConnection(id: string): Promise<void> {
   await sql`DELETE FROM oauth_connections WHERE id = ${id}`;
+}
+
+export async function revokeOAuthConnection(id: string): Promise<void> {
+  await sql`
+    UPDATE oauth_connections
+    SET revoked = TRUE, encrypted_refresh_token = '', encryption_iv = ''
+    WHERE id = ${id}
+  `;
 }
 
 export async function updateOAuthConnection(

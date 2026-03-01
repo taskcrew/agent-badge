@@ -8,6 +8,7 @@ interface OAuthConnection {
   label: string;
   googleEmail: string;
   scopes: string;
+  revoked: boolean;
   createdAt: string;
 }
 
@@ -34,6 +35,11 @@ export default function OAuth() {
     });
     setEditingId(null);
     setEditLabel("");
+    fetchConnections();
+  };
+
+  const revokeConnection = async (id: string) => {
+    await fetch(`${API}/oauth/connections/${id}/revoke`, { method: "POST" });
     fetchConnections();
   };
 
@@ -70,7 +76,7 @@ export default function OAuth() {
         </thead>
         <tbody>
           {connections.map((conn) => (
-            <tr key={conn.id}>
+            <tr key={conn.id} style={conn.revoked ? { opacity: 0.5 } : undefined}>
               <td>{conn.provider.toUpperCase()}</td>
               <td>
                 {editingId === conn.id ? (
@@ -96,20 +102,35 @@ export default function OAuth() {
               </td>
               <td>{conn.googleEmail}</td>
               <td style={{ fontSize: "0.7rem" }}>{conn.scopes}</td>
-              <td>{new Date(conn.createdAt).toLocaleDateString()}</td>
               <td>
-                <button
-                  className="row-action-btn"
-                  onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
-                >
-                  Edit
-                </button>
-                <button
-                  className="row-action-btn delete"
-                  onClick={() => deleteConnection(conn.id)}
-                >
-                  Revoke
-                </button>
+                {conn.revoked
+                  ? <span style={{ color: "var(--danger, #e55)" }}>REVOKED</span>
+                  : new Date(conn.createdAt).toLocaleDateString()}
+              </td>
+              <td>
+                {conn.revoked ? (
+                  <button
+                    className="row-action-btn delete"
+                    onClick={() => deleteConnection(conn.id)}
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="row-action-btn"
+                      onClick={() => { setEditingId(conn.id); setEditLabel(conn.label); }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="row-action-btn delete"
+                      onClick={() => revokeConnection(conn.id)}
+                    >
+                      Revoke
+                    </button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
