@@ -11,8 +11,32 @@ interface ActivityEntry {
   timestamp: string;
 }
 
+const ACTION_LABELS: Record<string, { protocol: string; label: string }> = {
+  credential_access: { protocol: "CRED_REQ", label: "GRANTED" },
+  credential_access_denied: { protocol: "CRED_REQ", label: "DENIED" },
+  oauth_token_issued: { protocol: "OAUTH", label: "TOKEN ISSUED" },
+  oauth_token_denied: { protocol: "OAUTH", label: "DENIED" },
+  oauth_signin_click: { protocol: "OAUTH", label: "SIGNIN CLICK" },
+  oauth_signin_success: { protocol: "OAUTH", label: "SIGNIN OK" },
+  oauth_signin_failed: { protocol: "OAUTH", label: "SIGNIN FAIL" },
+  otp_fetched: { protocol: "OTP", label: "CODE FETCHED" },
+  otp_fetch_failed: { protocol: "OTP", label: "FETCH FAIL" },
+};
+
+function getActionInfo(action: string) {
+  const info = ACTION_LABELS[action];
+  if (info) return info;
+  const denied = action.includes("denied") || action.includes("failed");
+  return { protocol: action.toUpperCase().replace(/_/g, " "), label: denied ? "DENIED" : "GRANTED" };
+}
+
+function isDenied(action: string) {
+  return action.includes("denied") || action.includes("failed");
+}
+
 export default function Activity() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchActivity = async () => {
     const res = await fetch(`${API}/activity`);
@@ -30,12 +54,29 @@ export default function Activity() {
     return d.toLocaleTimeString("en-US", { hour12: false });
   };
 
+  const formatDate = (ts: string) => {
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const formatFull = (ts: string) => {
+    const d = new Date(ts);
+    return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  };
+
+  const sorted = [...entries].reverse();
+
   return (
     <>
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="live-dot" />
-        <span style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-          Live Feed — Refreshing Every 3s
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="live-dot" />
+          <span style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+            Live Feed — Refreshing Every 3s
+          </span>
+        </div>
+        <span style={{ fontSize: "0.75rem", color: "var(--sys-cyan-dim)" }}>
+          {entries.length} EVENT{entries.length !== 1 ? "S" : ""}
         </span>
       </div>
 
@@ -43,6 +84,7 @@ export default function Activity() {
         <table>
           <thead>
             <tr>
+              <th style={{ width: 30 }}></th>
               <th>SYS_TIME</th>
               <th>BADGE_ID</th>
               <th>TARGET_NODE</th>
@@ -51,24 +93,88 @@ export default function Activity() {
             </tr>
           </thead>
           <tbody>
-            {[...entries].reverse().map((entry) => {
-              const denied = entry.action.includes("denied");
+            {sorted.map((entry) => {
+              const denied = isDenied(entry.action);
               const cls = denied ? "text-red" : "";
+              const info = getActionInfo(entry.action);
+              const expanded = expandedId === entry.id;
+
               return (
-                <tr key={entry.id}>
-                  <td className={denied ? "text-red" : ""} style={{ color: denied ? undefined : "var(--sys-cyan-dim)" }}>
-                    {formatTime(entry.timestamp)}
+                <tr
+                  key={entry.id}
+                  onClick={() => setExpandedId(expanded ? null : entry.id)}
+                  style={{ cursor: "pointer" }}
+                  className={expanded ? "audit-row-expanded" : ""}
+                >
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    <div style={{ display: "flex" }}>
+                      <div style={{ width: 40, padding: "15px 8px 15px 15px", color: "var(--sys-cyan-dim)", fontSize: "0.75rem" }}>
+                        {expanded ? "▾" : "▸"}
+                      </div>
+                      <div style={{ flex: "0 0 110px", padding: 15, color: denied ? "var(--alert-red)" : "var(--sys-cyan-dim)" }}>
+                        {formatTime(entry.timestamp)}
+                      </div>
+                      <div style={{ flex: 1, padding: 15 }} className={cls}>
+                        {entry.agentName}
+                      </div>
+                      <div style={{ flex: 1, padding: 15 }} className={denied ? "text-red" : "text-cyan"}>
+                        {entry.site.toUpperCase()}
+                      </div>
+                      <div style={{ flex: "0 0 120px", padding: 15 }} className={cls}>
+                        {info.protocol}
+                      </div>
+                      <div style={{ flex: "0 0 150px", padding: 15 }} className={cls}>
+                        [ {info.label} ]
+                      </div>
+                    </div>
+
+                    {expanded && (
+                      <div className="audit-detail">
+                        <div className="audit-detail-grid">
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">EVENT_ID</span>
+                            <span className="audit-detail-value">{entry.id}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">TIMESTAMP</span>
+                            <span className="audit-detail-value">{formatFull(entry.timestamp)}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">DATE</span>
+                            <span className="audit-detail-value">{formatDate(entry.timestamp)}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">AGENT_ID</span>
+                            <span className="audit-detail-value">{entry.agentId}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">AGENT_NAME</span>
+                            <span className="audit-detail-value">{entry.agentName}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">ACTION</span>
+                            <span className="audit-detail-value">{entry.action}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">TARGET_SITE</span>
+                            <span className="audit-detail-value">{entry.site}</span>
+                          </div>
+                          <div className="audit-detail-item">
+                            <span className="audit-detail-label">STATUS</span>
+                            <span className={`audit-detail-value ${denied ? "text-red" : ""}`} style={{ color: denied ? undefined : "#00c853" }}>
+                              {denied ? "FAILED / DENIED" : "SUCCESS"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </td>
-                  <td className={cls}>{entry.agentName}</td>
-                  <td className={denied ? "text-red" : "text-cyan"}>{entry.site.toUpperCase()}</td>
-                  <td className={cls}>AUTH_REQ</td>
-                  <td className={cls}>[ {denied ? "DENIED" : "GRANTED"} ]</td>
                 </tr>
               );
             })}
             {entries.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-state">
+                <td colSpan={6} className="empty-state">
                   NO AUDIT EVENTS RECORDED
                 </td>
               </tr>

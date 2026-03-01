@@ -707,6 +707,44 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
   width: 100%;
 }
 
+/* --- AUDIT EXPANDABLE ROWS --- */
+.audit-row-expanded > td {
+  border-bottom-color: var(--sys-cyan);
+}
+
+.audit-detail {
+  border-top: 1px dashed var(--sys-cyan-dim);
+  padding: 16px 20px 20px 55px;
+  background: rgba(77, 243, 255, 0.03);
+  animation: fadeIn 0.15s ease;
+}
+
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 32px;
+}
+
+.audit-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.audit-detail-label {
+  font-size: 0.6rem;
+  color: var(--sys-cyan-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.audit-detail-value {
+  font-size: 0.8rem;
+  color: var(--sys-cyan);
+  font-family: 'IBM Plex Mono', monospace;
+  word-break: break-all;
+}
+
 /* --- 1PASSWORD BADGE --- */
 .onepass-badge {
   border: 1px solid var(--sys-cyan);
