@@ -8,7 +8,7 @@ const API_BASE = "https://agent-badge.onrender.com";
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "FETCH_CREDENTIALS") {
-    handleFetchCredentials(message.site, sender.tab?.id)
+    handleFetchCredentials(message.site, message.url, sender.tab?.id)
       .then(sendResponse)
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true; // keep the message channel open for async response
@@ -55,22 +55,40 @@ async function getApiKey() {
   return result.agentApiKey || null;
 }
 
-async function handleFetchCredentials(site, tabId) {
+async function handleFetchCredentials(site, url, tabId) {
   const apiKey = await getApiKey();
   if (!apiKey) {
     return { success: false, error: "No API key configured. Open the Agent Badge popup to set one." };
   }
 
-  const response = await fetch(`${API_BASE}/credentials/${encodeURIComponent(site)}`, {
-    headers: {
-      "X-Agent-Key": apiKey,
-      "Content-Type": "application/json"
-    }
-  });
+  // Try URL-based lookup first if a URL is provided
+  let response;
+  let lookupKey = site || "unknown";
 
-  if (!response.ok) {
-    const body = await response.text();
-    return { success: false, error: `Backend returned ${response.status}: ${body}` };
+  if (url) {
+    response = await fetch(`${API_BASE}/credentials/by-url/${encodeURIComponent(url)}`, {
+      headers: {
+        "X-Agent-Key": apiKey,
+        "Content-Type": "application/json"
+      }
+    });
+    lookupKey = url;
+  }
+
+  // Fall back to site label lookup if URL lookup failed or no URL provided
+  if ((!response || !response.ok) && site) {
+    response = await fetch(`${API_BASE}/credentials/${encodeURIComponent(site)}`, {
+      headers: {
+        "X-Agent-Key": apiKey,
+        "Content-Type": "application/json"
+      }
+    });
+    lookupKey = site;
+  }
+
+  if (!response || !response.ok) {
+    const body = response ? await response.text() : "No URL or site provided";
+    return { success: false, error: `Backend returned ${response?.status || "N/A"}: ${body}` };
   }
 
   const data = await response.json();
@@ -86,7 +104,7 @@ async function handleFetchCredentials(site, tabId) {
       body: JSON.stringify({
         agentApiKey: apiKey,
         action: "credential_access",
-        site
+        site: lookupKey
       })
     });
   } catch (_) {

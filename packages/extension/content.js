@@ -247,22 +247,24 @@
         properties: {
           site: {
             type: "string",
-            description: "The site identifier to log into (e.g. 'crm', 'github')"
+            description: "Optional site label hint (e.g. 'crm', 'github'). If omitted, credentials are matched by the current page URL."
           }
         },
-        required: ["site"]
+        required: []
       },
       execute: async (input) => {
-        const site = input.site;
+        const site = input.site || "";
+        const url = window.location.origin;
 
         if (!hasLoginForm()) {
           return { result: "No login form detected on this page." };
         }
 
         // Ask background.js to fetch credentials from the SaaS backend
+        // Pass both URL (primary) and site label (fallback)
         const response = await new Promise((resolve) => {
           chrome.runtime.sendMessage(
-            { type: "FETCH_CREDENTIALS", site },
+            { type: "FETCH_CREDENTIALS", site, url },
             resolve
           );
         });
@@ -617,7 +619,7 @@
       console.log("[Agent Badge] Manual login trigger...");
       const response = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          { type: "FETCH_CREDENTIALS", site: "crm" },
+          { type: "FETCH_CREDENTIALS", site: "crm", url: window.location.origin },
           resolve
         );
       });

@@ -266,7 +266,16 @@ export async function deleteCredential(id: string): Promise<void> {
 }
 
 export async function getCredentialByUrl(url: string): Promise<Credential | undefined> {
-  const rows = await sql`SELECT * FROM credentials WHERE url = ${url} LIMIT 1`;
+  // Try exact match first, then origin-based match (stored URL starts with provided origin, or vice versa)
+  const rows = await sql`
+    SELECT * FROM credentials
+    WHERE url = ${url}
+       OR url LIKE ${url + '/%'}
+       OR ${url} LIKE url || '%'
+    ORDER BY
+      CASE WHEN url = ${url} THEN 0 ELSE 1 END
+    LIMIT 1
+  `;
   return rows.length > 0 ? rowToCredential(rows[0]) : undefined;
 }
 
@@ -320,7 +329,8 @@ export async function isAgentLinkedToUrl(agentId: string, url: string): Promise<
   const rows = await sql`
     SELECT 1 FROM agent_credentials ac
     JOIN credentials c ON c.id = ac.credential_id
-    WHERE ac.agent_id = ${agentId} AND c.url = ${url}
+    WHERE ac.agent_id = ${agentId}
+      AND (c.url = ${url} OR c.url LIKE ${url + '/%'} OR ${url} LIKE c.url || '%')
     LIMIT 1
   `;
   return rows.length > 0;
