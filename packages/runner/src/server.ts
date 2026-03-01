@@ -22,6 +22,7 @@ interface RunSession {
   logs: string[];
   result?: string;
   error?: string;
+  liveUrl?: string;
   startedAt: string;
   completedAt?: string;
 }
@@ -121,8 +122,11 @@ async function runAgent(session: RunSession) {
   try {
     const run = client.run(session.prompt);
 
+    // Resolve the live URL once the task is created
+    resolveAndSetLiveUrl(run, session);
+
     for await (const step of run) {
-      session.logs.push(`[Step ${step.stepNumber}] ${step.nextGoal ?? ""}`);
+      session.logs.push(`[Step ${step.number}] ${step.nextGoal ?? ""}`);
     }
 
     const result = run.result!;
@@ -135,6 +139,29 @@ async function runAgent(session: RunSession) {
     session.error = err.message ?? String(err);
     session.logs.push(`Error: ${session.error}`);
     session.completedAt = new Date().toISOString();
+  }
+}
+
+async function resolveAndSetLiveUrl(run: ReturnType<typeof client.run>, session: RunSession) {
+  try {
+    // Wait for the task to be created so we have a taskId
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (run.taskId) { clearInterval(check); resolve(); }
+      }, 200);
+      setTimeout(() => { clearInterval(check); resolve(); }, 10_000);
+    });
+
+    if (!run.taskId) return;
+
+    const task = await client.tasks.get(run.taskId);
+    const browserSession = await client.sessions.get(task.sessionId);
+    if (browserSession.liveUrl) {
+      session.liveUrl = browserSession.liveUrl;
+      session.logs.push(`Live view available`);
+    }
+  } catch {
+    // non-critical — live URL is best-effort
   }
 }
 

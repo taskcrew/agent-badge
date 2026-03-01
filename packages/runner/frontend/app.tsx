@@ -9,6 +9,7 @@ interface Session {
   logs: string[];
   result?: string;
   error?: string;
+  liveUrl?: string;
   startedAt: string;
   completedAt?: string;
 }
@@ -125,6 +126,19 @@ function App() {
 
               {isExpanded && (
                 <div className="session-detail">
+                  {s.liveUrl && s.status === "running" && (
+                    <>
+                      <div className="session-detail-label">Live View</div>
+                      <div className="live-view-container">
+                        <iframe
+                          src={s.liveUrl}
+                          className="live-view-iframe"
+                          allow="autoplay"
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className="session-detail-label">Full Prompt</div>
                   <pre>{s.prompt}</pre>
 
