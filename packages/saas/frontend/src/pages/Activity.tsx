@@ -34,9 +34,23 @@ function isDenied(action: string) {
   return action.includes("denied") || action.includes("failed");
 }
 
+function formatEntryText(entry: ActivityEntry, info: { protocol: string; label: string }, denied: boolean) {
+  return [
+    `EVENT_ID:    ${entry.id}`,
+    `TIMESTAMP:   ${new Date(entry.timestamp).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC")}`,
+    `AGENT_ID:    ${entry.agentId}`,
+    `AGENT_NAME:  ${entry.agentName}`,
+    `ACTION:      ${entry.action}`,
+    `PROTOCOL:    ${info.protocol}`,
+    `TARGET_SITE: ${entry.site}`,
+    `STATUS:      ${denied ? "FAILED / DENIED" : "SUCCESS"} (${info.label})`,
+  ].join("\n");
+}
+
 export default function Activity() {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchActivity = async () => {
     const res = await fetch(`${API}/activity`);
@@ -102,7 +116,12 @@ export default function Activity() {
               return (
                 <tr
                   key={entry.id}
-                  onClick={() => setExpandedId(expanded ? null : entry.id)}
+                  onMouseUp={(e) => {
+                    const selection = window.getSelection();
+                    if (selection && selection.toString().length > 0) return;
+                    if ((e.target as HTMLElement).closest(".audit-detail")) return;
+                    setExpandedId(expanded ? null : entry.id);
+                  }}
                   style={{ cursor: "pointer" }}
                   className={expanded ? "audit-row-expanded" : ""}
                 >
@@ -129,7 +148,7 @@ export default function Activity() {
                     </div>
 
                     {expanded && (
-                      <div className="audit-detail">
+                      <div className="audit-detail" onClick={(e) => e.stopPropagation()}>
                         <div className="audit-detail-grid">
                           <div className="audit-detail-item">
                             <span className="audit-detail-label">EVENT_ID</span>
@@ -166,6 +185,17 @@ export default function Activity() {
                             </span>
                           </div>
                         </div>
+                        <button
+                          className="row-action-btn"
+                          style={{ marginTop: 14 }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(formatEntryText(entry, info, denied));
+                            setCopiedId(entry.id);
+                            setTimeout(() => setCopiedId((prev) => prev === entry.id ? null : prev), 1500);
+                          }}
+                        >
+                          {copiedId === entry.id ? "COPIED" : "COPY LOG"}
+                        </button>
                       </div>
                     )}
                   </td>
