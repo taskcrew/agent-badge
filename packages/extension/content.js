@@ -192,6 +192,159 @@
     return false;
   }
 
+  // --- Google Sign-In helpers ---
+
+  function clickGoogleSignInButton() {
+    // Try multiple selectors in priority order
+    const selectors = [
+      // GIS rendered buttons
+      '.gsi-material-button',
+      '.g_id_signin button',
+      '.g_id_signin div[role="button"]',
+      '.g_id_signin',
+      // Common third-party patterns
+      'button[data-provider="google"]',
+      '[class*="google-sign"] button',
+      '[class*="google-sign"]',
+      'button[class*="google"]',
+      '[id*="google-sign"] button',
+      '[id*="google-sign"]',
+      // OAuth links
+      'a[href*="accounts.google.com/o/oauth2"]',
+      'a[href*="accounts.google.com/signin"]',
+    ];
+
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function waitForSignInSuccess(timeoutMs) {
+    return new Promise((resolve) => {
+      const startUrl = window.location.href;
+      const startTime = Date.now();
+
+      // Indicators that sign-in succeeded
+      function checkSuccess() {
+        // URL changed (redirect after OAuth)
+        if (window.location.href !== startUrl) {
+          return "URL changed after sign-in — OAuth redirect completed.";
+        }
+        // Login elements disappeared
+        if (!hasGoogleSignIn() && !hasLoginForm()) {
+          return "Sign-in elements disappeared — login likely succeeded.";
+        }
+        // User menu / avatar appeared (common post-login indicators)
+        const userIndicators = [
+          '[class*="user-menu"]',
+          '[class*="avatar"]',
+          '[class*="profile"]',
+          '[aria-label*="account"]',
+          '[data-testid*="user"]',
+          '[class*="logged-in"]',
+        ];
+        for (const sel of userIndicators) {
+          const el = document.querySelector(sel);
+          if (el && el.offsetParent !== null) {
+            return "User profile elements detected — sign-in succeeded.";
+          }
+        }
+        return null;
+      }
+
+      // Immediate check
+      const immediate = checkSuccess();
+      if (immediate) { resolve(immediate); return; }
+
+      // Poll + MutationObserver
+      const observer = new MutationObserver(() => {
+        const result = checkSuccess();
+        if (result) {
+          observer.disconnect();
+          clearInterval(pollInterval);
+          resolve(result);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+      const pollInterval = setInterval(() => {
+        const result = checkSuccess();
+        if (result) {
+          observer.disconnect();
+          clearInterval(pollInterval);
+          resolve(result);
+        }
+        if (Date.now() - startTime > timeoutMs) {
+          observer.disconnect();
+          clearInterval(pollInterval);
+          resolve(null); // Timeout — no success detected
+        }
+      }, 500);
+    });
+  }
+
+  async function tryDirectPost(oauthConnectionId) {
+    const loginUriEl = document.querySelector('[data-login_uri]');
+    if (!loginUriEl) return null;
+
+    // Request ID token from background.js
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "FETCH_OAUTH_TOKEN", oauthConnectionId },
+        resolve
+      );
+    });
+
+    if (!response || !response.success || !response.idToken) {
+      return null;
+    }
+
+    const loginUri = loginUriEl.getAttribute('data-login_uri');
+    try {
+      const postResponse = await fetch(loginUri, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          credential: response.idToken,
+          g_csrf_token: getCsrfToken()
+        }),
+        credentials: "include"
+      });
+
+      if (postResponse.ok || postResponse.redirected) {
+        logOAuthActivity("oauth_signin_success");
+        window.location.reload();
+        return "Google Sign-In successful via direct POST. Page is reloading.";
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function logOAuthActivity(action) {
+    try {
+      chrome.runtime.sendMessage({
+        type: "LOG_ACTIVITY",
+        action,
+        site: window.location.hostname
+      });
+    } catch (_) {}
+  }
+
+  function getCsrfToken() {
+    // Try to read g_csrf_token cookie
+    const match = document.cookie.match(/g_csrf_token=([^;]+)/);
+    return match ? match[1] : "";
+  }
+
+  // --- Google Sign-In tool registration ---
+
   let googleSignInToolRegistered = false;
 
   function registerGoogleSignInTool() {
@@ -203,7 +356,8 @@
       name: "google_signin",
       description:
         "Sign into this website using Google OAuth via Agent Badge. " +
-        "The extension handles the sign-in flow securely — tokens never appear in the response.",
+        "The extension checks for an active Google session and clicks the Sign-In button. " +
+        "Tokens never appear in the response.",
       inputSchema: {
         type: "object",
         properties: {
@@ -219,80 +373,66 @@
           return { result: "No Google Sign-In detected on this page." };
         }
 
-        // Request ID token from background.js
-        const response = await new Promise((resolve) => {
+        // Strategy 1: Click-based with session detection (primary)
+        const sessionResult = await new Promise((resolve) => {
           chrome.runtime.sendMessage(
-            { type: "FETCH_OAUTH_TOKEN", oauthConnectionId: input.oauthConnectionId },
+            { type: "CHECK_GOOGLE_SESSION", oauthConnectionId: input.oauthConnectionId },
             resolve
           );
         });
 
-        if (!response || !response.success) {
-          const reason = response?.error || "Unknown error";
-          // Log failure (best-effort)
-          try {
-            chrome.runtime.sendMessage({
-              type: "LOG_ACTIVITY",
-              action: "oauth_signin_failed",
-              site: window.location.hostname
-            });
-          } catch (_) {}
-          return { result: `Failed to get OAuth token: ${reason}` };
+        if (!sessionResult) {
+          logOAuthActivity("oauth_signin_failed");
+          return { result: "Failed to check Google session status. Extension may not be connected." };
         }
 
-        // Primary strategy: find data-login_uri and POST the credential
-        const loginUriEl = document.querySelector('[data-login_uri]');
-        if (loginUriEl && response.idToken) {
-          const loginUri = loginUriEl.getAttribute('data-login_uri');
-          try {
-            const postResponse = await fetch(loginUri, {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                credential: response.idToken,
-                g_csrf_token: getCsrfToken()
-              }),
-              credentials: "include"
-            });
+        if (sessionResult.error && !sessionResult.hasSession && sessionResult.hasSession !== null) {
+          logOAuthActivity("oauth_signin_failed");
+          return { result: `Failed to check Google session: ${sessionResult.error}` };
+        }
 
-            if (postResponse.ok || postResponse.redirected) {
-              // Log success (best-effort)
-              try {
-                chrome.runtime.sendMessage({
-                  type: "LOG_ACTIVITY",
-                  action: "oauth_signin_success",
-                  site: window.location.hostname
-                });
-              } catch (_) {}
+        // If we know there's no session for the expected email
+        if (sessionResult.hasSession === false) {
+          const emailInfo = sessionResult.expectedEmail
+            ? ` Expected email: ${sessionResult.expectedEmail}.`
+            : "";
+          const sessionInfo = sessionResult.sessionEmails?.length
+            ? ` Currently signed-in accounts: ${sessionResult.sessionEmails.join(", ")}.`
+            : " No Google accounts are currently signed in.";
+          logOAuthActivity("oauth_signin_failed");
+          return {
+            result: `Cannot sign in: the required Google account is not signed into this browser.${emailInfo}${sessionInfo} Please sign into Google with the correct account first.`
+          };
+        }
 
-              // Reload to pick up the new session
-              window.location.reload();
-              return { result: "Google Sign-In successful. Page is reloading." };
-            }
-            return { result: `Google Sign-In POST returned status ${postResponse.status}. The site may require a different sign-in flow.` };
-          } catch (err) {
-            return { result: `Google Sign-In POST failed: ${err.message}` };
+        // Session exists (true) or unknown (null) — try clicking
+        if (clickGoogleSignInButton()) {
+          logOAuthActivity("oauth_signin_click");
+
+          // Wait for sign-in to complete
+          const successMessage = await waitForSignInSuccess(8000);
+          if (successMessage) {
+            logOAuthActivity("oauth_signin_success");
+            return { result: `Google Sign-In succeeded. ${successMessage}` };
           }
+
+          // Click happened but we couldn't confirm success — it might still be working
+          // (e.g. popup opened, redirect in progress)
+          return {
+            result: "Clicked Google Sign-In button. The OAuth flow may be in progress (popup or redirect). Check if the page state has changed."
+          };
         }
 
-        // Fallback: click the Google Sign-In button
-        const googleBtn = document.querySelector(
-          '.gsi-material-button, .g_id_signin button, [data-provider="google"], [class*="google-sign"] button, button[class*="google"]'
-        );
-        if (googleBtn) {
-          googleBtn.click();
-          return { result: "Clicked Google Sign-In button. The OAuth redirect flow should proceed." };
+        // Strategy 2: Direct POST fallback (for controlled apps like mock CRM)
+        const postResult = await tryDirectPost(input.oauthConnectionId);
+        if (postResult) {
+          return { result: postResult };
         }
 
+        logOAuthActivity("oauth_signin_failed");
         return { result: "Google Sign-In elements detected but could not interact with them automatically." };
       }
     });
-  }
-
-  function getCsrfToken() {
-    // Try to read g_csrf_token cookie
-    const match = document.cookie.match(/g_csrf_token=([^;]+)/);
-    return match ? match[1] : "";
   }
 
   // --- Manual test trigger (Ctrl+Shift+L) ---

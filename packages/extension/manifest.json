@@ -5,11 +5,13 @@
   "description": "Agentic identity vault — lets AI agents authenticate without seeing credentials",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "webNavigation"
   ],
   "host_permissions": [
     "http://localhost:3000/*",
-    "https://agent-badge.onrender.com/*"
+    "https://agent-badge.onrender.com/*",
+    "https://accounts.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"

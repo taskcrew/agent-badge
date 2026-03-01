@@ -253,6 +253,7 @@ app.post("/token", async (c) => {
     accessToken: tokenData.access_token,
     idToken: tokenData.id_token || null,
     expiresIn: tokenData.expires_in,
+    googleEmail: connection.googleEmail,
   });
 });
 
