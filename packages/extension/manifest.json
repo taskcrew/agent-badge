@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Badge",
+  "version": "1.0.0",
+  "description": "Agentic identity vault — lets AI agents authenticate without seeing credentials",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Agent Badge"
+  },
+  "icons": {}
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@agent-badge/agent",
+  "private": true,
+  "dependencies": {
+    "browser-use": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,52 @@
+import { Hono } from "hono";
+import {
+  storeCredential,
+  listCredentials,
+  getCredentialBySite,
+  findAgentByApiKey,
+  logActivity,
+} from "../store";
+
+const app = new Hono();
+
+// POST /credentials - Store credentials for a site
+app.post("/", async (c) => {
+  const body = await c.req.json();
+  const { site, email, password } = body;
+  if (!site || !email || !password) {
+    return c.json({ error: "site, email, and password are required" }, 400);
+  }
+  const cred = await storeCredential(site, email, password);
+  return c.json({ id: cred.id, site: cred.site, email: cred.email, createdAt: cred.createdAt }, 201);
+});
+
+// GET /credentials - List stored credentials (passwords redacted)
+app.get("/", async (c) => {
+  return c.json(await listCredentials());
+});
+
+// GET /credentials/:site - Fetch credentials for a site (requires API key)
+app.get("/:site", async (c) => {
+  const apiKey = c.req.header("X-Agent-Key");
+  if (!apiKey) {
+    return c.json({ error: "X-Agent-Key header is required" }, 401);
+  }
+
+  const agent = await findAgentByApiKey(apiKey);
+  if (!agent) {
+    return c.json({ error: "Invalid API key" }, 401);
+  }
+
+  const site = c.req.param("site");
+  const cred = await getCredentialBySite(site);
+  if (!cred) {
+    return c.json({ error: "No credentials found for this site" }, 404);
+  }
+
+  // Log the access
+  await logActivity(agent.id, agent.name, "credential_access", site);
+
+  return c.json({ site: cred.site, email: cred.email, password: cred.password });
+});
+
+export default app;
