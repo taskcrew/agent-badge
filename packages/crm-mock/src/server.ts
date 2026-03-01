@@ -112,6 +112,9 @@ app.get("/login", (c) => {
       </div>
       <button type="submit" class="btn-primary">Sign in</button>
     </form>
+    <div style="text-align:center;margin-top:20px;font-size:13px;color:#64748b;">
+      <a href="/login/google" style="color:#6c63ff;text-decoration:none;font-weight:500;">Sign in with Google instead</a>
+    </div>
   </div>
 </div>
 </body>
@@ -132,6 +135,86 @@ app.post("/login", async (c) => {
   }
 
   return c.redirect("/login?error=1");
+});
+
+// --- Google Sign-In page ---
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+
+app.get("/login/google", (c) => {
+  const error = c.req.query("error");
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Google Sign-In - NexusCRM</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>${css}
+.divider { display: flex; align-items: center; margin: 24px 0; color: #94a3b8; font-size: 13px; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+.divider span { padding: 0 12px; }
+.google-section { text-align: center; }
+.alt-login { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
+.alt-login a { color: #6c63ff; text-decoration: none; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="login-container">
+  <div class="login-card">
+    <div class="brand">
+      <h1>Nexus<span>CRM</span></h1>
+      <p>Sign in with Google</p>
+    </div>
+    ${error ? '<div class="error-msg">Google Sign-In failed. Please try again.</div>' : ""}
+    <div class="google-section">
+      <div id="g_id_onload"
+        data-client_id="${GOOGLE_CLIENT_ID}"
+        data-login_uri="/auth/google/callback"
+        data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard"
+        data-size="large"
+        data-theme="outline"
+        data-text="sign_in_with"
+        data-shape="rectangular"
+        data-logo_alignment="left"
+        data-width="320">
+      </div>
+    </div>
+    <div class="alt-login">
+      <a href="/login">Sign in with password instead</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>`);
+});
+
+// --- Google Sign-In callback ---
+app.post("/auth/google/callback", async (c) => {
+  const body = await c.req.parseBody();
+  const credential = body.credential as string;
+
+  if (!credential) {
+    return c.redirect("/login/google?error=1");
+  }
+
+  // Decode the JWT payload (middle segment) to get email
+  // In a real app you'd verify the signature; for a mock CRM we just decode
+  try {
+    const payload = JSON.parse(atob(credential.split(".")[1]));
+    const email = payload.email;
+
+    if (!email) {
+      return c.redirect("/login/google?error=1");
+    }
+
+    // Accept any Google account for this mock CRM
+    const sessionId = crypto.randomUUID();
+    sessions.set(sessionId, { email, createdAt: Date.now() });
+    setCookie(c, "crm_session", sessionId, { path: "/", httpOnly: true, maxAge: 86400 });
+    return c.redirect("/contacts");
+  } catch (_) {
+    return c.redirect("/login/google?error=1");
+  }
 });
 
 // --- Logout ---
