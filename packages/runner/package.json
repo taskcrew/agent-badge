@@ -9,7 +9,7 @@
   },
   "private": true,
   "scripts": {
-    "build": "bun build frontend/index.html --outdir frontend/dist",
+    "build": "NODE_ENV=production bun build frontend/index.html --outdir frontend/dist --minify",
     "dev": "bun --hot src/server.ts",
     "start": "bun run build && bun run src/server.ts"
   },
