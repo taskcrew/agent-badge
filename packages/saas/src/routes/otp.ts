@@ -37,7 +37,8 @@ app.post("/mailbox", async (c) => {
 
   const client = getMailClient();
   const inbox = await client.inboxes.create();
-  const inboxAddress = inbox.inboxId;
+  const localPart = inbox.inboxId.split("@")[0];
+  const inboxAddress = `${localPart}@agentmail.to`;
   await setAgentMailbox(agentId, inboxAddress);
 
   return c.json({ inboxAddress }, 201);

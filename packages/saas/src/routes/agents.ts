@@ -35,7 +35,9 @@ app.get("/", async (c) => {
       ...agent,
       linkedCredentials: await getLinkedCredentials(agent.id),
       linkedOAuthConnections: await getLinkedOAuthConnections(agent.id),
-      mailboxAddress: (await getAgentMailbox(agent.id)) || null,
+      mailboxAddress: await getAgentMailbox(agent.id).then((addr) =>
+        addr ? `${addr.split("@")[0]}@agentmail.to` : null
+      ),
     }))
   );
   return c.json(result);
@@ -96,7 +98,8 @@ app.post("/:id/mailbox", async (c) => {
   }
   const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
   const inbox = await client.inboxes.create();
-  const inboxAddress = inbox.inboxId;
+  const localPart = inbox.inboxId.split("@")[0];
+  const inboxAddress = `${localPart}@agentmail.to`;
   await setAgentMailbox(agentId, inboxAddress);
   return c.json({ inboxAddress }, 201);
 });
