@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badge_OS - Issuance Engraver</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #020c17;
+            --sys-cyan: #4df3ff;
+            --cream-base: #e8ecef;
+            --cream-shadow: #b0bfc6;
+            --ink-dark: #1a202c;
+            --metal-dark: #12181d;
+            --metal-light: #2c363f;
+            --safe-green: #2d8a56;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image: linear-gradient(rgba(10, 46, 56, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(10, 46, 56, 0.5) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: var(--sys-cyan);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        /* --- THE MANUFACTURING TRAY --- */
+        .machine-tray {
+            background: var(--metal-dark);
+            width: 380px; height: 500px;
+            border-radius: 12px;
+            border: 4px solid #000;
+            box-shadow: inset 5px 5px 20px rgba(0,0,0,0.9), 0 20px 50px rgba(0,0,0,0.8);
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Inner recessed bed where the card sits */
+        .tray-bed {
+            width: 300px; height: 420px;
+            background: #080b0e;
+            border-radius: 10px;
+            box-shadow: inset 0 0 15px #000;
+            position: relative;
+        }
+
+        /* --- THE BADGE LAYERS --- */
+        .badge-base {
+            position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+            background-color: var(--cream-base);
+            border-radius: 6px;
+            box-shadow: inset 2px 2px 4px #fff, inset -2px -2px 6px var(--cream-shadow), 5px 5px 15px rgba(0,0,0,0.5);
+            /* Starts lowered and blank */
+            transform: translateY(20px) scale(0.95);
+            opacity: 0.5;
+            transition: all 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .mag-stripe { position: absolute; top: 40px; width: 100%; height: 30px; background: repeating-linear-gradient(90deg, #b0bfc6, #b0bfc6 2px, #cdd5d9 2px, #cdd5d9 4px); opacity: 0.3; }
+
+        /* The Printed Data Layer (Hidden initially by clip-path) */
+        .printed-data {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 20px; padding-top: 90px;
+            color: var(--ink-dark);
+            clip-path: inset(0 0 100% 0); /* Hides everything from the bottom up */
+            z-index: 5;
+        }
+
+        .agent-name { font-weight: 800; font-size: 1.6rem; text-transform: uppercase; border-bottom: 2px solid var(--cream-shadow); padding-bottom: 10px; margin-bottom: 15px; }
+        .data-row { display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; margin-bottom: 12px; font-weight: 600; }
+        .api-key { letter-spacing: 2px; }
+
+        /* --- THE GANTRY & LASER --- */
+        .gantry {
+            position: absolute; left: 0; width: 100%; height: 30px;
+            background: linear-gradient(to bottom, var(--metal-light), var(--metal-dark));
+            border-top: 2px solid #555; border-bottom: 4px solid #000;
+            top: 0%; /* Animates from 0 to 100 */
+            z-index: 10;
+            box-shadow: 0 15px 20px rgba(0,0,0,0.8);
+            display: none; /* Hidden until printing */
+            align-items: center;
+        }
+
+        .laser-head {
+            width: 20px; height: 15px;
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 4px;
+            position: absolute; left: 5%;
+            transition: left 0.1s linear;
+        }
+
+        /* The UV Light beam */
+        .laser-beam {
+            position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 15px;
+            background: var(--sys-cyan);
+            opacity: 0;
+            box-shadow: 0 0 15px var(--sys-cyan), 0 0 30px var(--sys-cyan);
+            border-radius: 0 0 50% 50%;
+        }
+
+        /* Rapid left-right animation for the print head */
+        @keyframes scan-x {
+            0% { left: 5%; }
+            100% { left: 88%; }
+        }
+
+        /* --- THE HYDRAULIC PUNCH --- */
+        .punch-piston {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%) translateY(-50px);
+            width: 70px; height: 70px;
+            background: radial-gradient(circle, var(--metal-light) 40%, #000 100%);
+            border-radius: 50%;
+            border: 4px solid #111;
+            z-index: 20;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.9);
+            transition: transform 0.15s cubic-bezier(0.5, 0, 1, 1); /* Drop speed */
+            opacity: 0;
+        }
+        
+        /* The actual hole in the badge */
+        .punch-hole {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            width: 50px; height: 12px;
+            background: #080b0e; /* Matches tray bed to look like a hole */
+            border-radius: 6px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9), 0px 1px 0px rgba(255,255,255,0.8);
+            opacity: 0; /* Hidden until punched */
+        }
+
+        /* --- CONTROLS --- */
+        .controls { margin-top: 30px; text-align: center; width: 380px; }
+        .sys-log { background: rgba(0,0,0,0.5); border: 1px solid var(--sys-cyan); padding: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; margin-bottom: 15px; text-align: left; height: 60px; }
+        .issue-btn {
+            background: var(--cream-base); color: var(--ink-dark);
+            font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 1rem; text-transform: uppercase;
+            padding: 15px 30px; width: 100%; border: none; cursor: pointer;
+            box-shadow: inset 2px 2px 0px #fff, inset -4px -4px 0px var(--cream-shadow), 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .issue-btn:active { box-shadow: inset 2px 2px 5px rgba(0,0,0,0.4); transform: translateY(2px); }
+        .issue-btn:disabled { opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div class="machine-tray">
+        <div class="tray-bed">
+            
+            <div class="badge-base" id="badge">
+                <div class="mag-stripe"></div>
+                <div class="punch-hole" id="hole"></div>
+                
+                <div class="printed-data" id="printed-data">
+                    <div class="agent-name">CRM_BOT_V2</div>
+                    <div class="data-row"><span style="color: #666;">CLEARANCE</span> <span>LVL_01 (1 VAULT)</span></div>
+                    <div class="data-row"><span style="color: #666;">KEY_SIG</span> <span class="api-key">AK_••••UJ4S</span></div>
+                    <div class="data-row" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                        <span style="color: #666;">STATUS</span> 
+                        <span style="color: var(--safe-green); display: flex; align-items: center; gap: 8px;">
+                            <span style="width:8px; height:8px; background:var(--safe-green); border-radius:50%; box-shadow: inset 1px 1px 2px rgba(0,0,0,0.5);"></span> ACTIVE
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gantry" id="gantry">
+                <div class="laser-head" id="laser-head">
+                    <div class="laser-beam" id="laser-beam"></div>
+                </div>
+            </div>
+
+            <div class="punch-piston" id="piston"></div>
+
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="sys-log" id="log">> SYSTEM READY.<br>> AWAITING ISSUANCE PROTOCOL.</div>
+        <button class="issue-btn" id="btn" onclick="issueBadge()">Initialize Resin Engraver</button>
+    </div>
+
+    <script>
+        function updateLog(msg) {
+            document.getElementById('log').innerHTML += `<br>> ${msg}`;
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+        }
+
+        function issueBadge() {
+            const btn = document.getElementById('btn');
+            const badge = document.getElementById('badge');
+            const gantry = document.getElementById('gantry');
+            const laserBeam = document.getElementById('laser-beam');
+            const laserHead = document.getElementById('laser-head');
+            const printedData = document.getElementById('printed-data');
+            const piston = document.getElementById('piston');
+            const hole = document.getElementById('hole');
+
+            // 1. Lock UI & Reset state
+            btn.disabled = true;
+            document.getElementById('log').innerHTML = "> PROTOCOL INITIATED.";
+            hole.style.opacity = '0';
+            printedData.style.clipPath = 'inset(0 0 100% 0)';
+            
+            // 2. Load the blank card into the tray
+            setTimeout(() => {
+                updateLog("LOADING BLANK MEDIA...");
+                badge.style.transform = 'translateY(0) scale(1)';
+                badge.style.opacity = '1';
+            }, 500);
+
+            // 3. Start Engraving Process
+            setTimeout(() => {
+                updateLog("ENGAGING UV RESIN LASER...");
+                gantry.style.display = 'flex';
+                gantry.style.top = '10%'; // Move to top of card
+                laserBeam.style.opacity = '1'; // Turn on light
+                
+                // Rapid left-right movement
+                laserHead.style.animation = 'scan-x 0.15s infinite alternate ease-in-out';
+
+                // Scan down the Y axis using requestAnimationFrame for smooth clip-path mapping
+                let progress = 10; // Start at 10% down the card
+                
+                function scanDown() {
+                    progress += 0.4; // Speed of downward scan
+                    gantry.style.top = `${progress}%`;
+                    
+                    // Reveal the text precisely where the laser has passed
+                    // If progress is at 50%, the clip-path bottom inset should be 50%
+                    printedData.style.clipPath = `inset(0 0 ${100 - progress}% 0)`;
+
+                    if (progress < 90) {
+                        requestAnimationFrame(scanDown);
+                    } else {
+                        finishScan();
+                    }
+                }
+                
+                requestAnimationFrame(scanDown);
+
+            }, 1500);
+
+            // 4. Clean up scan and trigger Punch
+            function finishScan() {
+                laserBeam.style.opacity = '0';
+                laserHead.style.animation = 'none';
+                gantry.style.display = 'none';
+                updateLog("CURING COMPLETE. ALIGNING STAMP...");
+
+                setTimeout(stampHole, 800);
+            }
+
+            // 5. The Hydraulic Punch
+            function stampHole() {
+                piston.style.opacity = '1';
+                
+                // Piston slams down
+                requestAnimationFrame(() => {
+                    piston.style.transform = 'translateX(-50%) translateY(0px) scale(1.1)';
+                    
+                    setTimeout(() => {
+                        // Impact! Hole appears instantly.
+                        hole.style.opacity = '1';
+                        updateLog("LANYARD APERTURE PUNCHED.");
+                        
+                        // Screen shake on impact
+                        document.body.style.transform = "translateY(5px)";
+                        setTimeout(() => document.body.style.transform = "translateY(0)", 50);
+
+                        // Piston retracts
+                        piston.style.transition = 'transform 0.5s ease-out';
+                        piston.style.transform = 'translateX(-50%) translateY(-100px) scale(0.8)';
+                        
+                        setTimeout(finalize, 600);
+                    }, 150); // Matches the drop speed
+                });
+            }
+
+            // 6. Present the final badge
+            function finalize() {
+                piston.style.opacity = '0';
+                
+                // Pop the badge up slightly to "present" it to the user
+                badge.style.boxShadow = "inset 2px 2px 4px #fff, inset -2px -2px 6px var(--cream-shadow), 15px 15px 30px rgba(0,0,0,0.8)";
+                badge.style.transform = "translateY(-5px) scale(1.02)";
+                
+                updateLog("BADGE ISSUED SUCCESFULLY.");
+                btn.innerText = "Badge Ready for Agent";
+            }
+        }
+    </script>
+</body>
+</html>
