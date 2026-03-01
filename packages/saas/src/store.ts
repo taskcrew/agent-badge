@@ -27,6 +27,17 @@ export interface ActivityEntry {
   timestamp: string;
 }
 
+export interface OAuthConnection {
+  id: string;
+  provider: string;
+  label: string;
+  googleEmail: string;
+  encryptedRefreshToken: string;
+  encryptionIv: string;
+  scopes: string;
+  createdAt: string;
+}
+
 // --- Database connection ---
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -87,6 +98,29 @@ export async function initDatabase() {
       credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (agent_id, credential_id)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS oauth_connections (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'google',
+      label TEXT NOT NULL,
+      google_email TEXT NOT NULL,
+      encrypted_refresh_token TEXT NOT NULL,
+      encryption_iv TEXT NOT NULL,
+      scopes TEXT NOT NULL DEFAULT 'openid email profile',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS agent_oauth_connections (
+      agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      oauth_connection_id TEXT NOT NULL REFERENCES oauth_connections(id) ON DELETE CASCADE,
+      allowed_scopes TEXT NOT NULL DEFAULT 'openid email profile',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (agent_id, oauth_connection_id)
     )
   `;
 
@@ -299,4 +333,89 @@ export async function logActivity(agentId: string, agentName: string, action: st
 export async function listActivity(): Promise<ActivityEntry[]> {
   const rows = await sql`SELECT * FROM activity ORDER BY timestamp`;
   return rows.map(rowToActivity);
+}
+
+// --- OAuth connection operations ---
+
+function rowToOAuthConnection(row: Record<string, unknown>): OAuthConnection {
+  return {
+    id: row.id as string,
+    provider: row.provider as string,
+    label: row.label as string,
+    googleEmail: row.google_email as string,
+    encryptedRefreshToken: row.encrypted_refresh_token as string,
+    encryptionIv: row.encryption_iv as string,
+    scopes: row.scopes as string,
+    createdAt: (row.created_at as Date).toISOString(),
+  };
+}
+
+export async function createOAuthConnection(
+  label: string,
+  googleEmail: string,
+  encryptedRefreshToken: string,
+  encryptionIv: string,
+  scopes: string
+): Promise<OAuthConnection> {
+  const id = crypto.randomUUID();
+  const rows = await sql`
+    INSERT INTO oauth_connections (id, label, google_email, encrypted_refresh_token, encryption_iv, scopes, created_at)
+    VALUES (${id}, ${label}, ${googleEmail}, ${encryptedRefreshToken}, ${encryptionIv}, ${scopes}, NOW())
+    RETURNING *
+  `;
+  return rowToOAuthConnection(rows[0]);
+}
+
+export async function listOAuthConnections(): Promise<Omit<OAuthConnection, "encryptedRefreshToken" | "encryptionIv">[]> {
+  const rows = await sql`SELECT id, provider, label, google_email, scopes, created_at FROM oauth_connections ORDER BY created_at`;
+  return rows.map((row) => ({
+    id: row.id as string,
+    provider: row.provider as string,
+    label: row.label as string,
+    googleEmail: row.google_email as string,
+    scopes: row.scopes as string,
+    createdAt: (row.created_at as Date).toISOString(),
+  }));
+}
+
+export async function getOAuthConnection(id: string): Promise<OAuthConnection | undefined> {
+  const rows = await sql`SELECT * FROM oauth_connections WHERE id = ${id} LIMIT 1`;
+  return rows.length > 0 ? rowToOAuthConnection(rows[0]) : undefined;
+}
+
+export async function deleteOAuthConnection(id: string): Promise<void> {
+  await sql`DELETE FROM oauth_connections WHERE id = ${id}`;
+}
+
+// --- Agent-OAuth linking ---
+
+export async function linkAgentOAuth(agentId: string, oauthConnectionId: string, allowedScopes: string): Promise<void> {
+  await sql`
+    INSERT INTO agent_oauth_connections (agent_id, oauth_connection_id, allowed_scopes)
+    VALUES (${agentId}, ${oauthConnectionId}, ${allowedScopes})
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+export async function unlinkAgentOAuth(agentId: string, oauthConnectionId: string): Promise<void> {
+  await sql`
+    DELETE FROM agent_oauth_connections
+    WHERE agent_id = ${agentId} AND oauth_connection_id = ${oauthConnectionId}
+  `;
+}
+
+export async function getLinkedOAuthConnections(agentId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT oauth_connection_id FROM agent_oauth_connections WHERE agent_id = ${agentId}
+  `;
+  return rows.map((r) => r.oauth_connection_id as string);
+}
+
+export async function getAgentOAuthLink(agentId: string, oauthConnectionId: string): Promise<{ allowedScopes: string } | undefined> {
+  const rows = await sql`
+    SELECT allowed_scopes FROM agent_oauth_connections
+    WHERE agent_id = ${agentId} AND oauth_connection_id = ${oauthConnectionId}
+    LIMIT 1
+  `;
+  return rows.length > 0 ? { allowedScopes: rows[0].allowed_scopes as string } : undefined;
 }

@@ -170,6 +170,131 @@
     });
   }
 
+  // --- Google Sign-In detection and tool ---
+
+  function hasGoogleSignIn() {
+    // Detect common Google Sign-In patterns
+    const selectors = [
+      '[data-login_uri]',           // Google Identity Services callback URL
+      '.g_id_signin',               // GIS rendered button container
+      '.gsi-material-button',       // GIS material-styled button
+      '[data-client_id]',           // GIS client ID attribute
+      'iframe[src*="accounts.google.com"]',
+      'a[href*="accounts.google.com/o/oauth2"]',
+      'a[href*="accounts.google.com/signin"]',
+      'button[data-provider="google"]',
+      '[class*="google-sign"]',
+      '[id*="google-sign"]',
+    ];
+    for (const sel of selectors) {
+      if (document.querySelector(sel)) return true;
+    }
+    return false;
+  }
+
+  let googleSignInToolRegistered = false;
+
+  function registerGoogleSignInTool() {
+    if (googleSignInToolRegistered) return;
+    if (typeof navigator.modelContext === "undefined") return;
+
+    googleSignInToolRegistered = true;
+    navigator.modelContext.registerTool({
+      name: "google_signin",
+      description:
+        "Sign into this website using Google OAuth via Agent Badge. " +
+        "The extension handles the sign-in flow securely — tokens never appear in the response.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          oauthConnectionId: {
+            type: "string",
+            description: "The OAuth connection ID from Agent Badge to use for sign-in"
+          }
+        },
+        required: ["oauthConnectionId"]
+      },
+      execute: async (input) => {
+        if (!hasGoogleSignIn()) {
+          return { result: "No Google Sign-In detected on this page." };
+        }
+
+        // Request ID token from background.js
+        const response = await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            { type: "FETCH_OAUTH_TOKEN", oauthConnectionId: input.oauthConnectionId },
+            resolve
+          );
+        });
+
+        if (!response || !response.success) {
+          const reason = response?.error || "Unknown error";
+          // Log failure (best-effort)
+          try {
+            chrome.runtime.sendMessage({
+              type: "LOG_ACTIVITY",
+              action: "oauth_signin_failed",
+              site: window.location.hostname
+            });
+          } catch (_) {}
+          return { result: `Failed to get OAuth token: ${reason}` };
+        }
+
+        // Primary strategy: find data-login_uri and POST the credential
+        const loginUriEl = document.querySelector('[data-login_uri]');
+        if (loginUriEl && response.idToken) {
+          const loginUri = loginUriEl.getAttribute('data-login_uri');
+          try {
+            const postResponse = await fetch(loginUri, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                credential: response.idToken,
+                g_csrf_token: getCsrfToken()
+              }),
+              credentials: "include"
+            });
+
+            if (postResponse.ok || postResponse.redirected) {
+              // Log success (best-effort)
+              try {
+                chrome.runtime.sendMessage({
+                  type: "LOG_ACTIVITY",
+                  action: "oauth_signin_success",
+                  site: window.location.hostname
+                });
+              } catch (_) {}
+
+              // Reload to pick up the new session
+              window.location.reload();
+              return { result: "Google Sign-In successful. Page is reloading." };
+            }
+            return { result: `Google Sign-In POST returned status ${postResponse.status}. The site may require a different sign-in flow.` };
+          } catch (err) {
+            return { result: `Google Sign-In POST failed: ${err.message}` };
+          }
+        }
+
+        // Fallback: click the Google Sign-In button
+        const googleBtn = document.querySelector(
+          '.gsi-material-button, .g_id_signin button, [data-provider="google"], [class*="google-sign"] button, button[class*="google"]'
+        );
+        if (googleBtn) {
+          googleBtn.click();
+          return { result: "Clicked Google Sign-In button. The OAuth redirect flow should proceed." };
+        }
+
+        return { result: "Google Sign-In elements detected but could not interact with them automatically." };
+      }
+    });
+  }
+
+  function getCsrfToken() {
+    // Try to read g_csrf_token cookie
+    const match = document.cookie.match(/g_csrf_token=([^;]+)/);
+    return match ? match[1] : "";
+  }
+
   // --- Manual test trigger (Ctrl+Shift+L) ---
   document.addEventListener("keydown", async (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === "L") {
@@ -195,13 +320,15 @@
   if (hasLoginForm()) {
     registerLoginTool();
   }
+  if (hasGoogleSignIn()) {
+    registerGoogleSignInTool();
+  }
 
-  // Also watch for dynamically added login forms (SPAs)
+  // Also watch for dynamically added login forms and Google Sign-In (SPAs)
   const observer = new MutationObserver(() => {
-    if (hasLoginForm()) {
-      registerLoginTool();
-      observer.disconnect();
-    }
+    if (hasLoginForm()) registerLoginTool();
+    if (hasGoogleSignIn()) registerGoogleSignInTool();
+    if (loginToolRegistered && googleSignInToolRegistered) observer.disconnect();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 })();

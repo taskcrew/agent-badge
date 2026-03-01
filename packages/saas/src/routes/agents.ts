@@ -6,6 +6,9 @@ import {
   linkAgentCredential,
   unlinkAgentCredential,
   getLinkedCredentials,
+  linkAgentOAuth,
+  unlinkAgentOAuth,
+  getLinkedOAuthConnections,
 } from "../store";
 
 const app = new Hono();
@@ -28,6 +31,7 @@ app.get("/", async (c) => {
     agents.map(async (agent) => ({
       ...agent,
       linkedCredentials: await getLinkedCredentials(agent.id),
+      linkedOAuthConnections: await getLinkedOAuthConnections(agent.id),
     }))
   );
   return c.json(result);
@@ -50,6 +54,26 @@ app.delete("/:id/links/:credentialId", async (c) => {
   const agentId = c.req.param("id");
   const credentialId = c.req.param("credentialId");
   await unlinkAgentCredential(agentId, credentialId);
+  return c.json({ unlinked: true });
+});
+
+// POST /agents/:id/oauth-links - Link agent to an OAuth connection
+app.post("/:id/oauth-links", async (c) => {
+  const agentId = c.req.param("id");
+  const body = await c.req.json();
+  const { oauthConnectionId, allowedScopes } = body;
+  if (!oauthConnectionId) {
+    return c.json({ error: "oauthConnectionId is required" }, 400);
+  }
+  await linkAgentOAuth(agentId, oauthConnectionId, allowedScopes || "openid email profile");
+  return c.json({ linked: true }, 201);
+});
+
+// DELETE /agents/:id/oauth-links/:oauthConnectionId - Unlink
+app.delete("/:id/oauth-links/:oauthConnectionId", async (c) => {
+  const agentId = c.req.param("id");
+  const oauthConnectionId = c.req.param("oauthConnectionId");
+  await unlinkAgentOAuth(agentId, oauthConnectionId);
   return c.json({ unlinked: true });
 });
 

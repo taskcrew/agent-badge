@@ -4,6 +4,7 @@ import { serveStatic } from "hono/bun";
 import agentsRoutes, { authRoute } from "./routes/agents";
 import credentialsRoutes from "./routes/credentials";
 import activityRoutes from "./routes/activity";
+import oauthRoutes from "./routes/oauth";
 import { initDatabase } from "./store";
 
 const app = new Hono();
@@ -28,6 +29,7 @@ app.route("/agents", agentsRoutes);
 app.route("/credentials", credentialsRoutes);
 app.route("/auth", authRoute);
 app.route("/activity", activityRoutes);
+app.route("/oauth", oauthRoutes);
 
 // Health check
 app.get("/api/health", (c) => c.json({ status: "ok" }));

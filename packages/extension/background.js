@@ -14,6 +14,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // keep the message channel open for async response
   }
 
+  if (message.type === "FETCH_OAUTH_TOKEN") {
+    handleFetchOAuthToken(message.oauthConnectionId)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === "GET_STATUS") {
     handleGetStatus()
       .then(sendResponse)
@@ -68,6 +75,35 @@ async function handleFetchCredentials(site, tabId) {
   // These MUST NOT be forwarded to the WebMCP tool return value.
   // Map backend field names to what the content script expects.
   return { success: true, credentials: { username: data.email, password: data.password } };
+}
+
+async function handleFetchOAuthToken(oauthConnectionId) {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return { success: false, error: "No API key configured. Open the Agent Badge popup to set one." };
+  }
+
+  const response = await fetch(`${API_BASE}/oauth/token`, {
+    method: "POST",
+    headers: {
+      "X-Agent-Key": apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ oauthConnectionId })
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    return { success: false, error: `Backend returned ${response.status}: ${body}` };
+  }
+
+  const data = await response.json();
+  return {
+    success: true,
+    idToken: data.idToken,
+    accessToken: data.accessToken,
+    expiresIn: data.expiresIn
+  };
 }
 
 async function handleGetStatus() {

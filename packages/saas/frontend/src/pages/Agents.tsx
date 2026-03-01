@@ -8,12 +8,20 @@ interface Agent {
   apiKey: string;
   createdAt: string;
   linkedCredentials: string[];
+  linkedOAuthConnections: string[];
 }
 
 interface Credential {
   id: string;
   site: string;
   email: string;
+}
+
+interface OAuthConnection {
+  id: string;
+  provider: string;
+  label: string;
+  googleEmail: string;
 }
 
 const BARCODE_WIDTHS = [2,1,3,1,2,1,1,3,2,1,2,1,3,1,1,2,3,1,2,1,1,3,1,2,1,1,2,3,1,2];
@@ -115,9 +123,64 @@ function VaultLinker({
   );
 }
 
+function OAuthLinker({
+  agent,
+  oauthConnections,
+  onLink,
+  onUnlink,
+}: {
+  agent: Agent;
+  oauthConnections: OAuthConnection[];
+  onLink: (agentId: string, oauthConnectionId: string) => void;
+  onUnlink: (agentId: string, oauthConnectionId: string) => void;
+}) {
+  const linked = oauthConnections.filter((c) => agent.linkedOAuthConnections.includes(c.id));
+  const unlinked = oauthConnections.filter((c) => !agent.linkedOAuthConnections.includes(c.id));
+
+  return (
+    <div className="vault-linker" onClick={(e) => e.stopPropagation()}>
+      <div className="vault-linker-label">OAuth Access</div>
+      {linked.length > 0 && (
+        <div className="vault-chips">
+          {linked.map((conn) => (
+            <span key={conn.id} className="vault-chip linked">
+              {conn.label.toUpperCase()}
+              <button
+                className="vault-chip-remove"
+                onClick={(e) => { e.stopPropagation(); onUnlink(agent.id, conn.id); }}
+                title="Revoke OAuth access"
+              >
+                x
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {unlinked.length > 0 && (
+        <div className="vault-chips">
+          {unlinked.map((conn) => (
+            <span
+              key={conn.id}
+              className="vault-chip available"
+              onClick={(e) => { e.stopPropagation(); onLink(agent.id, conn.id); }}
+              title="Grant OAuth access"
+            >
+              + {conn.label.toUpperCase()}
+            </span>
+          ))}
+        </div>
+      )}
+      {oauthConnections.length === 0 && (
+        <div style={{ fontSize: "0.65rem", color: "var(--ink-muted)" }}>No OAuth connections created yet</div>
+      )}
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[]>([]);
   const [name, setName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -131,7 +194,12 @@ export default function Agents() {
     setCredentials(await res.json());
   };
 
-  useEffect(() => { fetchAgents(); fetchCredentials(); }, []);
+  const fetchOAuthConnections = async () => {
+    const res = await fetch(`${API}/oauth/connections`);
+    setOAuthConnections(await res.json());
+  };
+
+  useEffect(() => { fetchAgents(); fetchCredentials(); fetchOAuthConnections(); }, []);
 
   const createAgent = async () => {
     if (!name.trim()) return;
@@ -155,6 +223,22 @@ export default function Agents() {
 
   const unlinkCredential = async (agentId: string, credentialId: string) => {
     await fetch(`${API}/agents/${agentId}/links/${credentialId}`, {
+      method: "DELETE",
+    });
+    fetchAgents();
+  };
+
+  const linkOAuth = async (agentId: string, oauthConnectionId: string) => {
+    await fetch(`${API}/agents/${agentId}/oauth-links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oauthConnectionId }),
+    });
+    fetchAgents();
+  };
+
+  const unlinkOAuth = async (agentId: string, oauthConnectionId: string) => {
+    await fetch(`${API}/agents/${agentId}/oauth-links/${oauthConnectionId}`, {
       method: "DELETE",
     });
     fetchAgents();
@@ -252,6 +336,13 @@ export default function Agents() {
                 credentials={credentials}
                 onLink={linkCredential}
                 onUnlink={unlinkCredential}
+              />
+
+              <OAuthLinker
+                agent={agent}
+                oauthConnections={oauthConnections}
+                onLink={linkOAuth}
+                onUnlink={unlinkOAuth}
               />
             </div>
 
