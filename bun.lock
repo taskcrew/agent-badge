@@ -28,6 +28,7 @@
       "name": "@agent-badge/runner",
       "dependencies": {
         "browser-use-sdk": "^3.1.0",
+        "hono": "^4.12.3",
       },
       "devDependencies": {
         "@types/bun": "latest",

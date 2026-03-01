@@ -1,7 +1,19 @@
 import index from "../frontend/index.html";
+import { Hono } from "hono";
+import { basicAuth } from "hono/basic-auth";
 import { BrowserUse } from "browser-use-sdk";
 
+const DASHBOARD_USER = process.env.DASHBOARD_USER || "admin";
+const DASHBOARD_PASS = process.env.DASHBOARD_PASS;
+
+if (!DASHBOARD_PASS) {
+  console.error("DASHBOARD_PASS env var is required");
+  process.exit(1);
+}
+
 const client = new BrowserUse(); // reads BROWSER_USE_API_KEY from env
+
+// ---------- types ----------
 
 interface RunSession {
   id: string;
@@ -20,75 +32,88 @@ function generateId(): string {
   return crypto.randomUUID().slice(0, 8);
 }
 
+// ---------- Hono app ----------
+
+const app = new Hono();
+
+const auth = basicAuth({ username: DASHBOARD_USER, password: DASHBOARD_PASS });
+
+// Auth on everything except bundled assets (hashed filenames under /_bun/)
+app.use("*", async (c, next) => {
+  if (c.req.path.startsWith("/_bun/")) return next();
+  return auth(c, next);
+});
+
+app.post("/api/execute", async (c) => {
+  const { prompt } = await c.req.json();
+
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+    return c.json({ error: "Prompt is required" }, 400);
+  }
+
+  const id = generateId();
+  const session: RunSession = {
+    id,
+    prompt: prompt.trim(),
+    status: "running",
+    logs: [],
+    startedAt: new Date().toISOString(),
+  };
+
+  sessions.set(id, session);
+
+  runAgent(session).catch((err) => {
+    session.status = "error";
+    session.error = err.message ?? String(err);
+    session.completedAt = new Date().toISOString();
+  });
+
+  return c.json({ id, status: "running" });
+});
+
+app.get("/api/sessions/:id", (c) => {
+  const session = sessions.get(c.req.param("id"));
+  if (!session) return c.json({ error: "Session not found" }, 404);
+  return c.json(session);
+});
+
+app.get("/api/sessions", (c) => {
+  const list = Array.from(sessions.values())
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+    )
+    .slice(0, 50);
+  return c.json(list);
+});
+
+// SPA fallback — serve the bundled HTML for any non-API route
+app.get("*", async (c) => {
+  return new Response(Bun.file(index.index), {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+});
+
+// ---------- Bun server ----------
+
 const server = Bun.serve({
   port: process.env.PORT || 3100,
 
+  // HTML import registers the frontend bundle so /_bun/* assets are served
   routes: {
-    "/*": index,
-
-    "/api/execute": {
-      async POST(req) {
-        const body = await req.json();
-        const { prompt } = body;
-
-        if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
-          return Response.json(
-            { error: "Prompt is required" },
-            { status: 400 }
-          );
-        }
-
-        const id = generateId();
-        const session: RunSession = {
-          id,
-          prompt: prompt.trim(),
-          status: "running",
-          logs: [],
-          startedAt: new Date().toISOString(),
-        };
-
-        sessions.set(id, session);
-
-        // Fire and forget — run the browser agent in the background
-        runAgent(session).catch((err) => {
-          session.status = "error";
-          session.error = err.message ?? String(err);
-          session.completedAt = new Date().toISOString();
-        });
-
-        return Response.json({ id, status: "running" });
-      },
-    },
-
-    "/api/sessions/:id": {
-      GET(req) {
-        const session = sessions.get(req.params.id);
-        if (!session) {
-          return Response.json({ error: "Session not found" }, { status: 404 });
-        }
-        return Response.json(session);
-      },
-    },
-
-    "/api/sessions": {
-      GET() {
-        const list = Array.from(sessions.values())
-          .sort(
-            (a, b) =>
-              new Date(b.startedAt).getTime() -
-              new Date(a.startedAt).getTime()
-          )
-          .slice(0, 50);
-        return Response.json(list);
-      },
-    },
+    "/_bun/*": index,
   },
+
+  // Hono handles everything else (with basic auth)
+  fetch: app.fetch,
 
   development: process.env.NODE_ENV !== "production" && {
     hmr: true,
     console: true,
   },
 });
+
+// ---------- agent runner ----------
 
 async function runAgent(session: RunSession) {
   session.logs.push("Initializing browser agent...");
