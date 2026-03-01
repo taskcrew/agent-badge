@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const API = "";
 
@@ -100,10 +100,10 @@ export default function Activity() {
       </div>
 
       <div className="term-table-container">
-        <table>
+        <table className="audit-table">
           <thead>
             <tr>
-              <th style={{ width: 30 }}></th>
+              <th></th>
               <th>SYS_TIME</th>
               <th>BADGE_ID</th>
               <th>TARGET_NODE</th>
@@ -118,120 +118,123 @@ export default function Activity() {
               const info = getActionInfo(entry.action);
               const expanded = expandedId === entry.id;
 
-              return (
-                <tr
-                  key={entry.id}
-                  onMouseUp={(e) => {
-                    const selection = window.getSelection();
-                    if (selection && selection.toString().length > 0) return;
-                    if ((e.target as HTMLElement).closest(".audit-detail")) return;
-                    setExpandedId(expanded ? null : entry.id);
-                  }}
-                  style={{ cursor: "pointer" }}
-                  className={expanded ? "audit-row-expanded" : ""}
-                >
-                  <td colSpan={6} style={{ padding: 0 }}>
-                    <div style={{ display: "flex" }}>
-                      <div style={{ width: 40, padding: "15px 8px 15px 15px", color: "var(--sys-cyan-dim)", fontSize: "0.75rem" }}>
-                        {expanded ? "▾" : "▸"}
-                      </div>
-                      <div style={{ flex: "0 0 110px", padding: 15, color: denied ? "var(--alert-red)" : "var(--sys-cyan-dim)" }}>
-                        {formatTime(entry.timestamp)}
-                      </div>
-                      <div style={{ flex: 1, padding: 15 }} className={cls}>
-                        {entry.agentName}
-                      </div>
-                      <div style={{ flex: 1, padding: 15 }} className={denied ? "text-red" : "text-cyan"}>
-                        {entry.site.toUpperCase()}
-                        {entry.detail === "first_access" && (
-                          <span style={{
-                            marginLeft: 6,
-                            fontSize: "0.55rem",
-                            padding: "1px 4px",
-                            background: "#ffd600",
-                            color: "#000",
-                            borderRadius: 2,
-                            fontWeight: 700,
-                          }}>1ST</span>
-                        )}
-                      </div>
-                      <div style={{ flex: "0 0 120px", padding: 15 }} className={cls}>
-                        {info.protocol}
-                      </div>
-                      <div style={{ flex: "0 0 150px", padding: 15 }} className={cls}>
-                        [ {info.label} ]
-                      </div>
-                    </div>
+              const handleRowClick = (e: React.MouseEvent) => {
+                const selection = window.getSelection();
+                if (selection && selection.toString().length > 0) return;
+                if ((e.target as HTMLElement).closest(".audit-detail")) return;
+                setExpandedId(expanded ? null : entry.id);
+              };
 
-                    {expanded && (
-                      <div className="audit-detail" onClick={(e) => e.stopPropagation()}>
-                        <div className="audit-detail-grid">
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">EVENT_ID</span>
-                            <span className="audit-detail-value">{entry.id}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">TIMESTAMP</span>
-                            <span className="audit-detail-value">{formatFull(entry.timestamp)}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">DATE</span>
-                            <span className="audit-detail-value">{formatDate(entry.timestamp)}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">AGENT_ID</span>
-                            <span className="audit-detail-value">{entry.agentId}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">AGENT_NAME</span>
-                            <span className="audit-detail-value">{entry.agentName}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">ACTION</span>
-                            <span className="audit-detail-value">{entry.action}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">TARGET_SITE</span>
-                            <span className="audit-detail-value">{entry.site}</span>
-                          </div>
-                          <div className="audit-detail-item">
-                            <span className="audit-detail-label">STATUS</span>
-                            <span className={`audit-detail-value ${denied ? "text-red" : ""}`} style={{ color: denied ? undefined : "#00c853" }}>
-                              {denied ? "FAILED / DENIED" : "SUCCESS"}
-                            </span>
-                          </div>
-                          {entry.credentialId && (
+              return (
+                <React.Fragment key={entry.id}>
+                  <tr
+                    onMouseUp={handleRowClick}
+                    style={{ cursor: "pointer" }}
+                    className={expanded ? "audit-row-expanded" : ""}
+                  >
+                    <td style={{ color: "var(--sys-cyan-dim)", fontSize: "0.75rem", textAlign: "center" }}>
+                      {expanded ? "\u25BE" : "\u25B8"}
+                    </td>
+                    <td style={{ color: denied ? "var(--alert-red)" : "var(--sys-cyan-dim)", whiteSpace: "nowrap" }}>
+                      {formatTime(entry.timestamp)}
+                    </td>
+                    <td className={cls}>
+                      {entry.agentName}
+                    </td>
+                    <td className={denied ? "text-red" : "text-cyan"}>
+                      {entry.site.toUpperCase()}
+                      {entry.detail === "first_access" && (
+                        <span style={{
+                          marginLeft: 6,
+                          fontSize: "0.55rem",
+                          padding: "1px 4px",
+                          background: "#ffd600",
+                          color: "#000",
+                          borderRadius: 2,
+                          fontWeight: 700,
+                          verticalAlign: "middle",
+                        }}>1ST</span>
+                      )}
+                    </td>
+                    <td className={cls}>
+                      {info.protocol}
+                    </td>
+                    <td className={cls} style={{ whiteSpace: "nowrap" }}>
+                      [ {info.label} ]
+                    </td>
+                  </tr>
+                  {expanded && (
+                    <tr className="audit-row-expanded">
+                      <td colSpan={6} style={{ padding: 0 }}>
+                        <div className="audit-detail" onClick={(e) => e.stopPropagation()}>
+                          <div className="audit-detail-grid">
                             <div className="audit-detail-item">
-                              <span className="audit-detail-label">CREDENTIAL_ID</span>
-                              <span className="audit-detail-value">{entry.credentialId}</span>
+                              <span className="audit-detail-label">EVENT_ID</span>
+                              <span className="audit-detail-value">{entry.id}</span>
                             </div>
-                          )}
-                          {entry.detail && (
                             <div className="audit-detail-item">
-                              <span className="audit-detail-label">DETAIL</span>
-                              <span className={`audit-detail-value ${entry.detail === "first_access" ? "" : denied ? "text-red" : ""}`}
-                                style={entry.detail === "first_access" ? { color: "#ffd600" } : undefined}
-                              >
-                                {entry.detail === "first_access" ? "FIRST ACCESS" : entry.detail.toUpperCase()}
+                              <span className="audit-detail-label">TIMESTAMP</span>
+                              <span className="audit-detail-value">{formatFull(entry.timestamp)}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">DATE</span>
+                              <span className="audit-detail-value">{formatDate(entry.timestamp)}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">AGENT_ID</span>
+                              <span className="audit-detail-value">{entry.agentId}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">AGENT_NAME</span>
+                              <span className="audit-detail-value">{entry.agentName}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">ACTION</span>
+                              <span className="audit-detail-value">{entry.action}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">TARGET_SITE</span>
+                              <span className="audit-detail-value">{entry.site}</span>
+                            </div>
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">STATUS</span>
+                              <span className={`audit-detail-value ${denied ? "text-red" : ""}`} style={{ color: denied ? undefined : "#00c853" }}>
+                                {denied ? "FAILED / DENIED" : "SUCCESS"}
                               </span>
                             </div>
-                          )}
+                            {entry.credentialId && (
+                              <div className="audit-detail-item">
+                                <span className="audit-detail-label">CREDENTIAL_ID</span>
+                                <span className="audit-detail-value">{entry.credentialId}</span>
+                              </div>
+                            )}
+                            {entry.detail && (
+                              <div className="audit-detail-item">
+                                <span className="audit-detail-label">DETAIL</span>
+                                <span className={`audit-detail-value ${entry.detail === "first_access" ? "" : denied ? "text-red" : ""}`}
+                                  style={entry.detail === "first_access" ? { color: "#ffd600" } : undefined}
+                                >
+                                  {entry.detail === "first_access" ? "FIRST ACCESS" : entry.detail.toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="row-action-btn"
+                            style={{ marginTop: 14 }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(formatEntryText(entry, info, denied));
+                              setCopiedId(entry.id);
+                              setTimeout(() => setCopiedId((prev) => prev === entry.id ? null : prev), 1500);
+                            }}
+                          >
+                            {copiedId === entry.id ? "COPIED" : "COPY LOG"}
+                          </button>
                         </div>
-                        <button
-                          className="row-action-btn"
-                          style={{ marginTop: 14 }}
-                          onClick={() => {
-                            navigator.clipboard.writeText(formatEntryText(entry, info, denied));
-                            setCopiedId(entry.id);
-                            setTimeout(() => setCopiedId((prev) => prev === entry.id ? null : prev), 1500);
-                          }}
-                        >
-                          {copiedId === entry.id ? "COPIED" : "COPY LOG"}
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
             {entries.length === 0 && (

@@ -735,6 +735,15 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
 }
 
 /* --- AUDIT EXPANDABLE ROWS --- */
+.audit-table {
+  table-layout: fixed;
+}
+
+.audit-table th:nth-child(1) { width: 36px; }
+.audit-table th:nth-child(2) { width: 110px; }
+.audit-table th:nth-child(5) { width: 120px; }
+.audit-table th:nth-child(6) { width: 160px; }
+
 .audit-row-expanded > td {
   border-bottom-color: var(--sys-cyan);
 }
