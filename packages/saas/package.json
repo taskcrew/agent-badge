@@ -3,8 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "bun run src/server.ts",
-    "dev:frontend": "bunx vite frontend",
-    "build": "bunx vite build frontend",
+    "dev:frontend": "bun x vite frontend",
+    "build": "bun x vite build frontend",
     "start": "bun run src/server.ts"
   },
   "dependencies": {
