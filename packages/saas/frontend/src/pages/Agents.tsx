@@ -9,6 +9,7 @@ interface Agent {
   createdAt: string;
   linkedCredentials: string[];
   linkedOAuthConnections: string[];
+  mailboxAddress: string | null;
 }
 
 interface Credential {
@@ -177,6 +178,46 @@ function OAuthLinker({
   );
 }
 
+function MailboxSection({
+  agent,
+  onCreate,
+  onDelete,
+}: {
+  agent: Agent;
+  onCreate: (agentId: string) => void;
+  onDelete: (agentId: string) => void;
+}) {
+  return (
+    <div className="vault-linker" onClick={(e) => e.stopPropagation()}>
+      <div className="vault-linker-label">OTP Mailbox</div>
+      {agent.mailboxAddress ? (
+        <div className="vault-chips">
+          <span className="vault-chip linked" style={{ fontSize: "0.6rem" }}>
+            {agent.mailboxAddress}
+            <button
+              className="vault-chip-remove"
+              onClick={(e) => { e.stopPropagation(); onDelete(agent.id); }}
+              title="Remove mailbox"
+            >
+              x
+            </button>
+          </span>
+        </div>
+      ) : (
+        <div className="vault-chips">
+          <span
+            className="vault-chip available"
+            onClick={(e) => { e.stopPropagation(); onCreate(agent.id); }}
+            title="Create OTP mailbox for this agent"
+          >
+            + CREATE MAILBOX
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -239,6 +280,21 @@ export default function Agents() {
 
   const unlinkOAuth = async (agentId: string, oauthConnectionId: string) => {
     await fetch(`${API}/agents/${agentId}/oauth-links/${oauthConnectionId}`, {
+      method: "DELETE",
+    });
+    fetchAgents();
+  };
+
+  const createMailbox = async (agentId: string) => {
+    await fetch(`${API}/agents/${agentId}/mailbox`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    fetchAgents();
+  };
+
+  const deleteMailbox = async (agentId: string) => {
+    await fetch(`${API}/agents/${agentId}/mailbox`, {
       method: "DELETE",
     });
     fetchAgents();
@@ -343,6 +399,12 @@ export default function Agents() {
                 oauthConnections={oauthConnections}
                 onLink={linkOAuth}
                 onUnlink={unlinkOAuth}
+              />
+
+              <MailboxSection
+                agent={agent}
+                onCreate={createMailbox}
+                onDelete={deleteMailbox}
               />
             </div>
 
