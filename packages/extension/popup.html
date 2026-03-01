@@ -2,92 +2,393 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-deep: #020c17;
+      --sys-cyan: #4df3ff;
+      --sys-cyan-dim: #1e6c7a;
+      --sys-cyan-dark: #0a2e38;
+      --cream-base: #e8ecef;
+      --cream-shadow: #b0bfc6;
+      --ink-dark: #0f1c29;
+      --alert-red: #ff4d4d;
+      --status-green: #00c853;
+      --led-off: #111820;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      width: 300px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 16px;
-      color: #1a1a2e;
-      background: #fafafa;
+      width: 320px;
+      font-family: 'IBM Plex Mono', monospace;
+      background-color: var(--bg-deep);
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(77, 243, 255, 0.05) 0%, transparent 60%),
+        linear-gradient(var(--sys-cyan-dark) 1px, transparent 1px),
+        linear-gradient(90deg, var(--sys-cyan-dark) 1px, transparent 1px);
+      background-size: 100% 100%, 30px 30px, 30px 30px;
+      color: var(--sys-cyan);
+      position: relative;
     }
-    h1 {
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 12px;
+
+    /* Scanlines */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.12), rgba(0,0,0,0.12) 1px, transparent 1px, transparent 2px);
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .housing {
+      position: relative;
+      border: 1px solid var(--sys-cyan-dim);
+      overflow: hidden;
+    }
+
+    /* === TOP BEZEL === */
+    .top-bezel {
+      background: rgba(2, 12, 23, 0.85);
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--sys-cyan-dim);
       display: flex;
-      align-items: center;
-      gap: 6px;
+      justify-content: space-between;
+      align-items: flex-end;
     }
-    .badge { font-size: 18px; }
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      font-size: 13px;
+
+    .brand-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      color: var(--sys-cyan);
+      letter-spacing: 3px;
+      text-shadow: 0 0 6px rgba(77, 243, 255, 0.4);
     }
-    .status.connected { background: #ecfdf5; color: #065f46; }
-    .status.disconnected { background: #fef2f2; color: #991b1b; }
-    .dot {
-      width: 8px;
+
+    .model-name {
+      font-size: 0.6rem;
+      color: var(--sys-cyan-dim);
+      letter-spacing: 1px;
+    }
+
+    /* === CARD READER SLOT === */
+    .reader-slot-housing {
+      background: var(--ink-dark);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--sys-cyan-dark);
+    }
+
+    .reader-slot {
+      height: 10px;
+      background: #000;
+      border-radius: 10px;
+      box-shadow: inset 0px 4px 8px rgba(0,0,0,1), 0px 1px 0px rgba(77, 243, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* The badge card that swipes through */
+    .swipe-card {
+      position: absolute;
+      top: 1px;
+      left: -60px;
+      width: 50px;
       height: 8px;
+      background: linear-gradient(90deg, var(--cream-base), #fff, var(--cream-shadow));
+      border-radius: 4px;
+      opacity: 0;
+      transition: none;
+    }
+
+    .swipe-card.swiping {
+      opacity: 1;
+      animation: cardSwipe 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes cardSwipe {
+      0%   { left: -60px; opacity: 1; }
+      40%  { opacity: 1; }
+      100% { left: calc(100% + 60px); opacity: 0.6; }
+    }
+
+    /* === LED ARRAY === */
+    .led-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: var(--ink-dark);
+      padding: 10px 16px 12px;
+      border-bottom: 1px solid var(--sys-cyan-dark);
+    }
+
+    .led-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .led {
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      flex-shrink: 0;
+      background: var(--led-off);
+      border: 2px solid #0a1520;
+      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8);
+      transition: all 0.15s;
     }
-    .connected .dot { background: #10b981; }
-    .disconnected .dot { background: #ef4444; }
-    label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: #6b7280;
+
+    .led-label {
+      font-size: 0.45rem;
+      color: var(--sys-cyan-dim);
+      text-transform: uppercase;
+      letter-spacing: 2px;
     }
-    input[type="text"] {
+
+    .led.yellow.active {
+      background: #ffcc00;
+      box-shadow: 0 0 8px #ffcc00, 0 0 20px rgba(255,204,0,0.4), inset 2px 2px 5px rgba(255,255,255,0.8);
+    }
+    .led.yellow.blink {
+      animation: ledBlink 0.5s ease-in-out infinite;
+    }
+    @keyframes ledBlink {
+      0%, 100% { background: var(--led-off); box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8); }
+      50% { background: #ffcc00; box-shadow: 0 0 8px #ffcc00, 0 0 20px rgba(255,204,0,0.4), inset 2px 2px 5px rgba(255,255,255,0.8); }
+    }
+
+    .led.green.active {
+      background: var(--status-green);
+      box-shadow: 0 0 12px var(--status-green), 0 0 25px rgba(0,200,83,0.5), inset 2px 2px 5px rgba(255,255,255,0.8);
+    }
+
+    .led.red.active {
+      background: var(--alert-red);
+      box-shadow: 0 0 12px var(--alert-red), 0 0 25px rgba(255,77,77,0.5), inset 2px 2px 5px rgba(255,255,255,0.8);
+    }
+
+    /* === MAIN BODY === */
+    .body-panel {
+      padding: 14px 16px;
+    }
+
+    .section-label {
+      font-size: 0.55rem;
+      text-transform: uppercase;
+      color: var(--sys-cyan-dim);
+      letter-spacing: 3px;
+      margin-bottom: 6px;
+    }
+
+    /* Status display - recessed LCD */
+    .lcd-display {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px 12px;
+      border: 1px solid var(--sys-cyan-dark);
+      margin-bottom: 14px;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+    }
+
+    .lcd-text {
+      font-size: 0.72rem;
+      color: var(--sys-cyan);
+      text-shadow: 0 0 6px rgba(77, 243, 255, 0.5);
+      letter-spacing: 1px;
+    }
+
+    .lcd-text.connected {
+      color: var(--status-green);
+      text-shadow: 0 0 6px rgba(0, 200, 83, 0.5);
+    }
+
+    .lcd-text.error {
+      color: var(--alert-red);
+      text-shadow: 0 0 6px rgba(255, 77, 77, 0.5);
+    }
+
+    .lcd-text.idle {
+      color: var(--sys-cyan-dim);
+      text-shadow: none;
+    }
+
+    /* Key input */
+    .key-slot {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 6px;
+      border: 1px solid var(--sys-cyan-dark);
+      margin-bottom: 12px;
+    }
+
+    .key-slot input {
       width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: monospace;
-      margin-bottom: 10px;
-    }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: #6366f1;
-      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-    }
-    button {
-      width: 100%;
-      padding: 8px;
-      background: #4f46e5;
-      color: white;
+      background: transparent;
       border: none;
-      border-radius: 6px;
-      font-size: 13px;
+      color: var(--sys-cyan);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      padding: 6px 4px;
+      letter-spacing: 1px;
+    }
+
+    .key-slot input:focus {
+      outline: none;
+      color: #fff;
+      text-shadow: 0 0 4px rgba(77, 243, 255, 0.4);
+    }
+
+    .key-slot input::placeholder {
+      color: var(--sys-cyan-dark);
+    }
+
+    /* Physical button — cream plastic like the dashboard "Print New Badge" */
+    .hw-button {
+      width: 100%;
+      padding: 10px;
+      background: var(--cream-base);
+      color: var(--ink-dark);
+      border: 2px solid var(--sys-cyan-dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
       font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
       cursor: pointer;
+      box-shadow:
+        inset 3px 3px 0px #fff,
+        inset -3px -3px 0px var(--cream-shadow),
+        0 0 10px rgba(77, 243, 255, 0.1);
+      transition: all 0.1s;
     }
-    button:hover { background: #4338ca; }
-    .agent-name {
-      font-weight: 600;
+
+    .hw-button:hover {
+      box-shadow:
+        inset 3px 3px 0px #fff,
+        inset -3px -3px 0px var(--cream-shadow),
+        0 0 15px rgba(77, 243, 255, 0.25);
     }
+
+    .hw-button:active {
+      box-shadow: inset 3px 3px 6px var(--cream-shadow);
+      transform: translateY(1px);
+    }
+
+    /* === BOTTOM BEZEL === */
+    .bottom-bezel {
+      background: rgba(2, 12, 23, 0.85);
+      padding: 6px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--sys-cyan-dark);
+    }
+
+    .serial-number {
+      font-size: 0.45rem;
+      color: var(--sys-cyan-dim);
+      letter-spacing: 2px;
+    }
+
+    .power-led {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--sys-cyan);
+      box-shadow: 0 0 6px var(--sys-cyan);
+      animation: powerPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes powerPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Mounting screws */
+    .screw {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, #3a4750, #1e262b);
+      box-shadow: inset 1px 1px 2px rgba(77,243,255,0.1), 0 1px 2px rgba(0,0,0,0.5);
+      position: absolute;
+      z-index: 10;
+    }
+    .screw::after {
+      content: "";
+      position: absolute;
+      top: 4px; left: 2px;
+      width: 6px; height: 1px;
+      background: #0a1520;
+      border-radius: 1px;
+      transform: rotate(30deg);
+    }
+    .screw.tl { top: 3px; left: 3px; }
+    .screw.tr { top: 3px; right: 3px; }
+    .screw.bl { bottom: 3px; left: 3px; }
+    .screw.br { bottom: 3px; right: 3px; }
   </style>
 </head>
 <body>
-  <h1><span class="badge">&#x1f6e1;</span> Agent Badge</h1>
+  <div class="housing">
+    <!-- Mounting screws -->
+    <div class="screw tl"></div>
+    <div class="screw tr"></div>
+    <div class="screw bl"></div>
+    <div class="screw br"></div>
 
-  <div id="status" class="status disconnected">
-    <span class="dot"></span>
-    <span id="status-text">Checking...</span>
+    <!-- Top metal bezel -->
+    <div class="top-bezel">
+      <div class="brand-label">Badge_OS</div>
+      <div class="model-name">CR-100</div>
+    </div>
+
+    <!-- Card reader slot -->
+    <div class="reader-slot-housing">
+      <div class="reader-slot">
+        <div class="swipe-card" id="swipe-card"></div>
+      </div>
+    </div>
+
+    <!-- LED array -->
+    <div class="led-panel">
+      <div class="led-unit">
+        <div class="led red" id="led-red"></div>
+        <span class="led-label">Deny</span>
+      </div>
+      <div class="led-unit">
+        <div class="led yellow" id="led-yellow"></div>
+        <span class="led-label">Proc</span>
+      </div>
+      <div class="led-unit">
+        <div class="led green" id="led-green"></div>
+        <span class="led-label">Auth</span>
+      </div>
+    </div>
+
+    <!-- Main body -->
+    <div class="body-panel">
+      <div class="section-label">Sys_Status</div>
+      <div class="lcd-display">
+        <span class="lcd-text idle" id="lcd-text">INITIALIZING...</span>
+      </div>
+
+      <div class="section-label">Agent_Key</div>
+      <div class="key-slot">
+        <input type="text" id="apiKey" placeholder="ab_key_..." />
+      </div>
+
+      <button class="hw-button" id="saveBtn">Register Key</button>
+    </div>
+
+    <!-- Bottom bezel -->
+    <div class="bottom-bezel">
+      <span class="serial-number">SN: AB-CR100-2026</span>
+      <div class="power-led"></div>
+    </div>
   </div>
-
-  <label for="apiKey">Agent API Key</label>
-  <input type="text" id="apiKey" placeholder="ab_key_..." />
-  <button id="saveBtn">Save Key</button>
 
   <script src="popup.js"></script>
 </body>

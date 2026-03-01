@@ -5,9 +5,10 @@
 (function () {
   "use strict";
 
-  // Avoid double-injection
-  if (window.__agentBadgeInjected) return;
-  window.__agentBadgeInjected = true;
+  // Avoid double-injection — use a DOM attribute that persists across
+  // content script worlds and re-injections
+  if (document.documentElement.hasAttribute("data-agent-badge-injected")) return;
+  document.documentElement.setAttribute("data-agent-badge-injected", "1");
 
   // --- Login form detection ---
 
@@ -100,7 +101,7 @@
     // Submit
     const form = passwordInput.closest("form");
     if (form) {
-      form.requestSubmit?.() ?? form.submit();
+      if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
     } else {
       const btn = findSubmitButton();
       if (btn) {
@@ -602,7 +603,7 @@
         if (otpResult) {
           const form = otpResult.inputs[0].closest("form");
           if (form) {
-            form.requestSubmit?.() ?? form.submit();
+            if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
             return { result: "OTP verified and submitted successfully." };
           }
         }
@@ -616,8 +617,14 @@
   }
 
   // --- Manual test trigger (Ctrl+Shift+L) ---
+  let loginInProgress = false;
   document.addEventListener("keydown", async (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === "L") {
+      if (loginInProgress) {
+        console.log("[Agent Badge] Login already in progress, skipping duplicate.");
+        return;
+      }
+      loginInProgress = true;
       console.log("[Agent Badge] Manual login trigger...");
       const response = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
@@ -658,9 +665,15 @@
 
     // --- Manual OTP trigger (Ctrl+Shift+O) ---
     if (e.ctrlKey && e.shiftKey && e.key === "O") {
+      if (otpInProgress) {
+        console.log("[Agent Badge] OTP fetch already in progress, skipping duplicate.");
+        return;
+      }
+      otpInProgress = true;
       console.log("[Agent Badge] Manual OTP trigger...");
       if (!hasOtpForm()) {
         console.error("[Agent Badge] No OTP form detected on this page.");
+        otpInProgress = false;
         return;
       }
 
@@ -669,6 +682,7 @@
         chrome.runtime.sendMessage({ type: "FETCH_OTP" }, resolve);
       });
       console.log("[Agent Badge] OTP response:", response);
+      otpInProgress = false;
 
       if (response?.success && response?.otp) {
         const filled = fillOtp(response.otp);
