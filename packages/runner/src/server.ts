@@ -20,7 +20,7 @@ function generateId(): string {
   return crypto.randomUUID().slice(0, 8);
 }
 
-export default Bun.serve({
+const server = Bun.serve({
   port: process.env.PORT || 3100,
 
   routes: {
@@ -113,4 +113,4 @@ async function runAgent(session: RunSession) {
   }
 }
 
-console.log(`Runner listening on http://localhost:${process.env.PORT || 3100}`);
+console.log(`Runner listening on http://localhost:${server.port}`);
