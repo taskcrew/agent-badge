@@ -21,6 +21,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "CHECK_GOOGLE_SESSION") {
+    handleCheckGoogleSession(message.oauthConnectionId)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ hasSession: null, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "LOG_ACTIVITY") {
+    handleLogActivity(message.action, message.site).catch(() => {});
+    // Fire-and-forget — respond immediately
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (message.type === "GET_STATUS") {
     handleGetStatus()
       .then(sendResponse)
@@ -59,6 +73,7 @@ async function handleFetchCredentials(site, tabId) {
     await fetch(`${API_BASE}/activity`, {
       method: "POST",
       headers: {
+        "X-Agent-Key": apiKey,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -102,8 +117,91 @@ async function handleFetchOAuthToken(oauthConnectionId) {
     success: true,
     idToken: data.idToken,
     accessToken: data.accessToken,
-    expiresIn: data.expiresIn
+    expiresIn: data.expiresIn,
+    googleEmail: data.googleEmail
   };
+}
+
+async function handleCheckGoogleSession(oauthConnectionId) {
+  // 1. Get the expected email from our backend
+  const tokenResult = await handleFetchOAuthToken(oauthConnectionId);
+  if (!tokenResult.success) {
+    return { hasSession: null, expectedEmail: null, error: tokenResult.error };
+  }
+  const expectedEmail = tokenResult.googleEmail;
+
+  // 2. Check browser's Google sessions via ListAccounts
+  let sessionEmails = [];
+  try {
+    const response = await fetch(
+      "https://accounts.google.com/ListAccounts?gpsia=1&source=ChromiumBrowser",
+      { credentials: "include" }
+    );
+    if (response.ok) {
+      const text = await response.text();
+      sessionEmails = parseListAccountsEmails(text);
+    }
+  } catch (_) {
+    // ListAccounts failed — return unknown session status so caller can try clicking anyway
+    return {
+      hasSession: null,
+      expectedEmail,
+      sessionEmails: [],
+      idToken: tokenResult.idToken
+    };
+  }
+
+  const hasSession = expectedEmail
+    ? sessionEmails.some((e) => e.toLowerCase() === expectedEmail.toLowerCase())
+    : sessionEmails.length > 0;
+
+  return {
+    hasSession,
+    expectedEmail,
+    sessionEmails,
+    idToken: tokenResult.idToken
+  };
+}
+
+// Parse emails from Google's ListAccounts response.
+// The response is a JSON-like nested array. Emails appear as strings containing "@".
+function parseListAccountsEmails(text) {
+  const emails = [];
+  try {
+    const data = JSON.parse(text);
+    extractEmails(data, emails);
+  } catch (_) {
+    // If JSON parsing fails, try regex extraction as fallback
+    const matches = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+    if (matches) {
+      emails.push(...new Set(matches));
+    }
+  }
+  return emails;
+}
+
+function extractEmails(obj, result) {
+  if (typeof obj === "string" && obj.includes("@") && obj.includes(".")) {
+    // Basic email pattern check
+    if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(obj)) {
+      result.push(obj);
+    }
+  } else if (Array.isArray(obj)) {
+    for (const item of obj) {
+      extractEmails(item, result);
+    }
+  }
+}
+
+async function handleLogActivity(action, site) {
+  const apiKey = await getApiKey();
+  if (!apiKey) return;
+
+  await fetch(`${API_BASE}/activity`, {
+    method: "POST",
+    headers: { "X-Agent-Key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ agentApiKey: apiKey, action, site })
+  });
 }
 
 async function handleGetStatus() {
@@ -116,6 +214,7 @@ async function handleGetStatus() {
     const response = await fetch(`${API_BASE}/auth`, {
       method: "POST",
       headers: {
+        "X-Agent-Key": apiKey,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ apiKey })
