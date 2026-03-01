@@ -228,6 +228,21 @@ export async function getCredentialByUrl(url: string): Promise<Credential | unde
   return rows.length > 0 ? rowToCredential(rows[0]) : undefined;
 }
 
+export async function getCredentialBySite(site: string): Promise<Credential | undefined> {
+  const rows = await sql`SELECT * FROM credentials WHERE LOWER(site) = LOWER(${site}) LIMIT 1`;
+  return rows.length > 0 ? rowToCredential(rows[0]) : undefined;
+}
+
+export async function isAgentLinkedToSite(agentId: string, site: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 FROM agent_credentials ac
+    JOIN credentials c ON c.id = ac.credential_id
+    WHERE ac.agent_id = ${agentId} AND LOWER(c.site) = LOWER(${site})
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 // --- Agent-Credential linking ---
 
 export async function linkAgentCredential(agentId: string, credentialId: string): Promise<void> {
