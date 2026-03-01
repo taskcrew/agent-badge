@@ -12,6 +12,7 @@ export interface Agent {
 export interface Credential {
   id: string;
   site: string;
+  url: string;
   email: string;
   password: string;
   createdAt: string;
@@ -51,11 +52,22 @@ export async function initDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS credentials (
       id TEXT PRIMARY KEY,
-      site TEXT NOT NULL UNIQUE,
+      site TEXT NOT NULL,
+      url TEXT NOT NULL DEFAULT '',
       email TEXT NOT NULL,
       password TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+
+  // Migration: add url column if missing
+  await sql`
+    ALTER TABLE credentials ADD COLUMN IF NOT EXISTS url TEXT NOT NULL DEFAULT ''
+  `;
+
+  // Drop old unique constraint on site if it exists (url is now the key identifier)
+  await sql`
+    ALTER TABLE credentials DROP CONSTRAINT IF EXISTS credentials_site_key
   `;
 
   await sql`
@@ -88,8 +100,8 @@ export async function initDatabase() {
       VALUES (${demoAgentId}, 'CRM Bot', 'ab_key_xK9mQ2vL8nP3wR7tY1uJ4s', NOW())
     `;
     await sql`
-      INSERT INTO credentials (id, site, email, password, created_at)
-      VALUES (${demoCredId}, 'crm', 'admin@company.com', 'P@ssw0rd123', NOW())
+      INSERT INTO credentials (id, site, url, email, password, created_at)
+      VALUES (${demoCredId}, 'NexusCRM', 'https://agent-badge-crm.onrender.com', 'admin@company.com', 'P@ssw0rd123', NOW())
     `;
     await sql`
       INSERT INTO agent_credentials (agent_id, credential_id)
@@ -126,6 +138,7 @@ function rowToCredential(row: Record<string, unknown>): Credential {
   return {
     id: row.id as string,
     site: row.site as string,
+    url: (row.url as string) || "",
     email: row.email as string,
     password: row.password as string,
     createdAt: (row.created_at as Date).toISOString(),
@@ -168,22 +181,22 @@ export async function findAgentByApiKey(apiKey: string): Promise<Agent | undefin
 
 // --- Credential operations ---
 
-export async function storeCredential(site: string, email: string, password: string): Promise<Credential> {
+export async function storeCredential(site: string, url: string, email: string, password: string): Promise<Credential> {
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO credentials (id, site, email, password, created_at)
-    VALUES (${id}, ${site}, ${email}, ${password}, NOW())
-    ON CONFLICT (site) DO UPDATE SET email = ${email}, password = ${password}, id = ${id}
+    INSERT INTO credentials (id, site, url, email, password, created_at)
+    VALUES (${id}, ${site}, ${url}, ${email}, ${password}, NOW())
     RETURNING *
   `;
   return rowToCredential(rows[0]);
 }
 
 export async function listCredentials(): Promise<Omit<Credential, "password">[]> {
-  const rows = await sql`SELECT id, site, email, created_at FROM credentials ORDER BY created_at`;
+  const rows = await sql`SELECT id, site, url, email, created_at FROM credentials ORDER BY created_at`;
   return rows.map((row) => ({
     id: row.id as string,
     site: row.site as string,
+    url: (row.url as string) || "",
     email: row.email as string,
     createdAt: (row.created_at as Date).toISOString(),
   }));
@@ -191,11 +204,12 @@ export async function listCredentials(): Promise<Omit<Credential, "password">[]>
 
 export async function updateCredential(
   id: string,
-  updates: { site?: string; email?: string; password?: string }
+  updates: { site?: string; url?: string; email?: string; password?: string }
 ): Promise<Credential> {
   const rows = await sql`
     UPDATE credentials SET
       site = COALESCE(${updates.site ?? null}, site),
+      url = COALESCE(${updates.url ?? null}, url),
       email = COALESCE(${updates.email ?? null}, email),
       password = COALESCE(${updates.password ?? null}, password)
     WHERE id = ${id}
@@ -209,8 +223,8 @@ export async function deleteCredential(id: string): Promise<void> {
   await sql`DELETE FROM credentials WHERE id = ${id}`;
 }
 
-export async function getCredentialBySite(site: string): Promise<Credential | undefined> {
-  const rows = await sql`SELECT * FROM credentials WHERE site = ${site} LIMIT 1`;
+export async function getCredentialByUrl(url: string): Promise<Credential | undefined> {
+  const rows = await sql`SELECT * FROM credentials WHERE url = ${url} LIMIT 1`;
   return rows.length > 0 ? rowToCredential(rows[0]) : undefined;
 }
 
@@ -245,11 +259,11 @@ export async function getLinkedAgents(credentialId: string): Promise<string[]> {
   return rows.map((r) => r.agent_id as string);
 }
 
-export async function isAgentLinkedToSite(agentId: string, site: string): Promise<boolean> {
+export async function isAgentLinkedToUrl(agentId: string, url: string): Promise<boolean> {
   const rows = await sql`
     SELECT 1 FROM agent_credentials ac
     JOIN credentials c ON c.id = ac.credential_id
-    WHERE ac.agent_id = ${agentId} AND c.site = ${site}
+    WHERE ac.agent_id = ${agentId} AND c.url = ${url}
     LIMIT 1
   `;
   return rows.length > 0;

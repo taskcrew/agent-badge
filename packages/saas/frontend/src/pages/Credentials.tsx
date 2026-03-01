@@ -5,6 +5,7 @@ const API = "";
 interface Credential {
   id: string;
   site: string;
+  url: string;
   email: string;
   createdAt: string;
 }
@@ -15,20 +16,22 @@ function EditRow({
   onCancel,
 }: {
   cred: Credential;
-  onSave: (id: string, updates: { site: string; email: string; password: string }) => void;
+  onSave: (id: string, updates: { site?: string; url?: string; email?: string; password?: string }) => void;
   onCancel: () => void;
 }) {
   const [site, setSite] = useState(cred.site);
+  const [url, setUrl] = useState(cred.url);
   const [email, setEmail] = useState(cred.email);
   const [password, setPassword] = useState("");
 
   const handleSave = () => {
     const updates: Record<string, string> = {};
     if (site !== cred.site) updates.site = site;
+    if (url !== cred.url) updates.url = url;
     if (email !== cred.email) updates.email = email;
     if (password) updates.password = password;
     if (Object.keys(updates).length === 0) { onCancel(); return; }
-    onSave(cred.id, updates as any);
+    onSave(cred.id, updates);
   };
 
   return (
@@ -39,6 +42,16 @@ function EditRow({
           value={site}
           onChange={(e) => setSite(e.target.value)}
           className="term-input inline-edit"
+          placeholder="Label"
+        />
+      </td>
+      <td>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="term-input inline-edit"
+          placeholder="https://..."
         />
       </td>
       <td>
@@ -72,6 +85,7 @@ function EditRow({
 export default function Credentials() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [site, setSite] = useState("");
+  const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -84,19 +98,20 @@ export default function Credentials() {
   useEffect(() => { fetchCredentials(); }, []);
 
   const addCredential = async () => {
-    if (!site.trim() || !email.trim() || !password.trim()) return;
+    if (!site.trim() || !url.trim() || !email.trim() || !password.trim()) return;
     await fetch(`${API}/credentials`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ site: site.trim(), email: email.trim(), password: password.trim() }),
+      body: JSON.stringify({ site: site.trim(), url: url.trim(), email: email.trim(), password: password.trim() }),
     });
     setSite("");
+    setUrl("");
     setEmail("");
     setPassword("");
     fetchCredentials();
   };
 
-  const updateCred = async (id: string, updates: { site?: string; email?: string; password?: string }) => {
+  const updateCred = async (id: string, updates: { site?: string; url?: string; email?: string; password?: string }) => {
     await fetch(`${API}/credentials/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -124,9 +139,18 @@ export default function Credentials() {
             type="text"
             value={site}
             onChange={(e) => setSite(e.target.value)}
-            placeholder="VAULT_NODE_ID"
+            placeholder="LABEL (e.g. NexusCRM)"
             className="term-input"
           />
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="TARGET_URL (e.g. https://...)"
+            className="term-input"
+          />
+        </div>
+        <div className="term-form-row">
           <input
             type="email"
             value={email}
@@ -134,8 +158,6 @@ export default function Credentials() {
             placeholder="IDENTITY_STRING"
             className="term-input"
           />
-        </div>
-        <div className="term-form-row">
           <input
             type="password"
             value={password}
@@ -155,8 +177,9 @@ export default function Credentials() {
         <table>
           <thead>
             <tr>
-              <th>Vault Node</th>
-              <th>Identity String</th>
+              <th>Label</th>
+              <th>Target URL</th>
+              <th>Identity</th>
               <th>Secret</th>
               <th>Actions</th>
             </tr>
@@ -173,6 +196,9 @@ export default function Credentials() {
               ) : (
                 <tr key={cred.id}>
                   <td className="text-cyan">{cred.site.toUpperCase()}</td>
+                  <td style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)" }}>
+                    {cred.url || "—"}
+                  </td>
                   <td>{cred.email}</td>
                   <td style={{ color: "var(--sys-cyan-dim)", letterSpacing: "0.15em" }}>
                     {"\u2022".repeat(12)}
@@ -198,7 +224,7 @@ export default function Credentials() {
             )}
             {credentials.length === 0 && (
               <tr>
-                <td colSpan={4} className="empty-state">
+                <td colSpan={5} className="empty-state">
                   NO VAULT NODES LINKED
                 </td>
               </tr>
