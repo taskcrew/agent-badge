@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { AgentMailClient } from "agentmail";
+import { Resend } from "resend";
 import postgres from "postgres";
 
 const app = new Hono();
@@ -43,30 +43,30 @@ async function validatePassword(password: string): Promise<boolean> {
   }
 }
 
-// --- AgentMail config for sending OTP emails ---
-const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY || "";
-const OTP_SENDER_INBOX = process.env.OTP_SENDER_INBOX || ""; // e.g. "nexuscrm-noreply@agentmail.to"
+// --- Resend config for sending OTP emails ---
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "onboarding@resend.dev";
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 async function sendOtpEmail(recipientEmail: string, otp: string): Promise<boolean> {
-  if (!AGENTMAIL_API_KEY || !OTP_SENDER_INBOX) {
-    console.log(`[OTP] AgentMail not configured. OTP code: ${otp}`);
+  if (!RESEND_API_KEY || !OTP_FROM_EMAIL) {
+    console.log(`[OTP] Resend not configured. OTP code: ${otp}`);
     return true; // Still allow flow to continue for testing
   }
 
-  try {
-    const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
-    const senderInboxId = OTP_SENDER_INBOX.split("@")[0];
-    if (!recipientEmail) {
-      console.log(`[OTP] No recipient email provided. OTP code: ${otp}`);
-      return true;
-    }
+  if (!recipientEmail) {
+    console.log(`[OTP] No recipient email provided. OTP code: ${otp}`);
+    return true;
+  }
 
-    await client.inboxes.messages.send(senderInboxId, {
-      to: [recipientEmail],
+  try {
+    const resend = new Resend(RESEND_API_KEY);
+    await resend.emails.send({
+      from: OTP_FROM_EMAIL,
+      to: recipientEmail,
       subject: "Your NexusCRM verification code",
       text: `Your verification code is ${otp}\n\nThis code expires in 5 minutes.\n\n— NexusCRM`,
       html: `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">
@@ -76,7 +76,7 @@ async function sendOtpEmail(recipientEmail: string, otp: string): Promise<boolea
         <p style="color:#64748b;font-size:13px;">This code expires in 5 minutes.</p>
       </div>`,
     });
-    console.log(`[OTP] Email sent to ${recipient}`);
+    console.log(`[OTP] Email sent to ${recipientEmail}`);
     return true;
   } catch (err) {
     console.error(`[OTP] Failed to send email:`, err);
