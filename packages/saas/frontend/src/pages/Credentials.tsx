@@ -7,6 +7,7 @@ interface Credential {
   site: string;
   url: string;
   email: string;
+  useAgentEmail: boolean;
   createdAt: string;
 }
 
@@ -16,22 +17,24 @@ function EditRow({
   onCancel,
 }: {
   cred: Credential;
-  onSave: (id: string, updates: { site?: string; url?: string; email?: string; password?: string }) => void;
+  onSave: (id: string, updates: { site?: string; url?: string; email?: string; password?: string; useAgentEmail?: boolean }) => void;
   onCancel: () => void;
 }) {
   const [site, setSite] = useState(cred.site);
   const [url, setUrl] = useState(cred.url);
   const [email, setEmail] = useState(cred.email);
   const [password, setPassword] = useState("");
+  const [useAgentEmail, setUseAgentEmail] = useState(cred.useAgentEmail);
 
   const handleSave = () => {
-    const updates: Record<string, string> = {};
+    const updates: Record<string, string | boolean> = {};
     if (site !== cred.site) updates.site = site;
     if (url !== cred.url) updates.url = url;
     if (email !== cred.email) updates.email = email;
     if (password) updates.password = password;
+    if (useAgentEmail !== cred.useAgentEmail) updates.useAgentEmail = useAgentEmail;
     if (Object.keys(updates).length === 0) { onCancel(); return; }
-    onSave(cred.id, updates);
+    onSave(cred.id, updates as any);
   };
 
   return (
@@ -73,6 +76,16 @@ function EditRow({
         />
       </td>
       <td>
+        <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: "0.8rem" }}>
+          <input
+            type="checkbox"
+            checked={useAgentEmail}
+            onChange={(e) => setUseAgentEmail(e.target.checked)}
+          />
+          Agent email
+        </label>
+      </td>
+      <td>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={handleSave} className="row-action-btn save">Save</button>
           <button onClick={onCancel} className="row-action-btn cancel">Cancel</button>
@@ -88,6 +101,7 @@ export default function Credentials() {
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [useAgentEmail, setUseAgentEmail] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const fetchCredentials = async () => {
@@ -102,16 +116,17 @@ export default function Credentials() {
     await fetch(`${API}/credentials`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ site: site.trim(), url: url.trim(), email: email.trim(), password: password.trim() }),
+      body: JSON.stringify({ site: site.trim(), url: url.trim(), email: email.trim(), password: password.trim(), useAgentEmail }),
     });
     setSite("");
     setUrl("");
     setEmail("");
     setPassword("");
+    setUseAgentEmail(false);
     fetchCredentials();
   };
 
-  const updateCred = async (id: string, updates: { site?: string; url?: string; email?: string; password?: string }) => {
+  const updateCred = async (id: string, updates: { site?: string; url?: string; email?: string; password?: string; useAgentEmail?: boolean }) => {
     await fetch(`${API}/credentials/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -166,6 +181,14 @@ export default function Credentials() {
             placeholder="SECRET_KEY"
             className="term-input"
           />
+          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", whiteSpace: "nowrap", fontSize: "0.85rem" }}>
+            <input
+              type="checkbox"
+              checked={useAgentEmail}
+              onChange={(e) => setUseAgentEmail(e.target.checked)}
+            />
+            Use agent email
+          </label>
           <button onClick={addCredential} className="term-submit">
             Store
           </button>
@@ -181,6 +204,7 @@ export default function Credentials() {
               <th>Target URL</th>
               <th>Identity</th>
               <th>Secret</th>
+              <th>Agent Email</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -204,6 +228,11 @@ export default function Credentials() {
                     {"\u2022".repeat(12)}
                   </td>
                   <td>
+                    {cred.useAgentEmail && (
+                      <span style={{ color: "var(--sys-green)", fontSize: "0.8rem" }}>ON</span>
+                    )}
+                  </td>
+                  <td>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
                         onClick={() => setEditingId(cred.id)}
@@ -224,7 +253,7 @@ export default function Credentials() {
             )}
             {credentials.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-state">
+                <td colSpan={6} className="empty-state">
                   NO VAULT NODES LINKED
                 </td>
               </tr>

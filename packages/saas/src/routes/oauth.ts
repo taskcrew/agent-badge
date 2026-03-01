@@ -4,6 +4,7 @@ import {
   createOAuthConnection,
   listOAuthConnections,
   getOAuthConnection,
+  updateOAuthConnection,
   deleteOAuthConnection,
   findAgentByApiKey,
   getAgentOAuthLink,
@@ -136,6 +137,20 @@ app.get("/google/callback", async (c) => {
 // GET /oauth/connections — List all connections (tokens redacted)
 app.get("/connections", async (c) => {
   return c.json(await listOAuthConnections());
+});
+
+// PATCH /oauth/connections/:id — Update connection label
+app.patch("/connections/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { label } = body;
+  if (!label || typeof label !== "string") {
+    return c.json({ error: "label is required" }, 400);
+  }
+  const updated = await updateOAuthConnection(id, { label });
+  // Return without tokens
+  const { encryptedRefreshToken, encryptionIv, ...safe } = updated;
+  return c.json(safe);
 });
 
 // DELETE /oauth/connections/:id — Revoke token at Google + delete from DB

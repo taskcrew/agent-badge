@@ -223,6 +223,8 @@ export default function Agents() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[]>([]);
   const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchAgents = async () => {
@@ -250,6 +252,24 @@ export default function Agents() {
       body: JSON.stringify({ name: name.trim() }),
     });
     setName("");
+    fetchAgents();
+  };
+
+  const updateAgent = async (id: string) => {
+    if (!editName.trim()) return;
+    await fetch(`${API}/agents/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName.trim() }),
+    });
+    setEditingId(null);
+    setEditName("");
+    fetchAgents();
+  };
+
+  const deleteAgent = async (id: string) => {
+    if (!confirm("Delete this agent? All linked credentials, OAuth connections, and mailbox will be unlinked.")) return;
+    await fetch(`${API}/agents/${id}`, { method: "DELETE" });
     fetchAgents();
   };
 
@@ -351,7 +371,26 @@ export default function Agents() {
               <div className="badge-header">
                 <div>
                   <div className="agent-label-small">Agent Identifier</div>
-                  <div className="agent-name">{agent.name}</div>
+                  {editingId === agent.id ? (
+                    <div className="inline-edit" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") updateAgent(agent.id);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        className="term-input"
+                        style={{ fontSize: "0.75rem", padding: "2px 4px", width: "120px" }}
+                        autoFocus
+                      />
+                      <button className="row-action-btn" onClick={() => updateAgent(agent.id)} style={{ fontSize: "0.6rem" }}>Save</button>
+                      <button className="row-action-btn" onClick={() => setEditingId(null)} style={{ fontSize: "0.6rem" }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="agent-name">{agent.name}</div>
+                  )}
                 </div>
                 <div className="agent-number">{String(idx + 1).padStart(2, "0")}</div>
               </div>
@@ -386,6 +425,21 @@ export default function Agents() {
               </div>
 
               <CopyKeyButton apiKey={agent.apiKey} />
+
+              <div className="badge-actions" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="row-action-btn"
+                  onClick={() => { setEditingId(agent.id); setEditName(agent.name); }}
+                >
+                  Rename
+                </button>
+                <button
+                  className="row-action-btn delete"
+                  onClick={() => deleteAgent(agent.id)}
+                >
+                  Delete
+                </button>
+              </div>
 
               <VaultLinker
                 agent={agent}

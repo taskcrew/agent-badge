@@ -10,6 +10,7 @@ import {
   isAgentLinkedToSite,
   updateCredential,
   deleteCredential,
+  getAgentMailbox,
 } from "../store";
 
 const app = new Hono();
@@ -17,12 +18,12 @@ const app = new Hono();
 // POST /credentials - Store credentials for a site
 app.post("/", async (c) => {
   const body = await c.req.json();
-  const { site, url, email, password } = body;
+  const { site, url, email, password, useAgentEmail } = body;
   if (!site || !url || !email || !password) {
     return c.json({ error: "site, url, email, and password are required" }, 400);
   }
-  const cred = await storeCredential(site, url, email, password);
-  return c.json({ id: cred.id, site: cred.site, url: cred.url, email: cred.email, createdAt: cred.createdAt }, 201);
+  const cred = await storeCredential(site, url, email, password, useAgentEmail ?? false);
+  return c.json({ id: cred.id, site: cred.site, url: cred.url, email: cred.email, useAgentEmail: cred.useAgentEmail, createdAt: cred.createdAt }, 201);
 });
 
 // GET /credentials - List stored credentials (passwords redacted)
@@ -34,13 +35,13 @@ app.get("/", async (c) => {
 app.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
-  const { site, url, email, password } = body;
-  if (!site && !url && !email && !password) {
+  const { site, url, email, password, useAgentEmail } = body;
+  if (!site && !url && !email && !password && useAgentEmail === undefined) {
     return c.json({ error: "At least one field is required" }, 400);
   }
   try {
-    const cred = await updateCredential(id, { site, url, email, password });
-    return c.json({ id: cred.id, site: cred.site, url: cred.url, email: cred.email, createdAt: cred.createdAt });
+    const cred = await updateCredential(id, { site, url, email, password, useAgentEmail });
+    return c.json({ id: cred.id, site: cred.site, url: cred.url, email: cred.email, useAgentEmail: cred.useAgentEmail, createdAt: cred.createdAt });
   } catch {
     return c.json({ error: "Credential not found" }, 404);
   }
@@ -79,7 +80,14 @@ app.get("/by-url/*", async (c) => {
   }
 
   await logActivity(agent.id, agent.name, "credential_access", url);
-  return c.json({ site: cred.site, url: cred.url, email: cred.email, password: cred.password });
+
+  let responseEmail = cred.email;
+  if (cred.useAgentEmail) {
+    const mailbox = await getAgentMailbox(agent.id);
+    if (mailbox) responseEmail = mailbox;
+  }
+
+  return c.json({ site: cred.site, url: cred.url, email: responseEmail, password: cred.password });
 });
 
 // GET /credentials/:site - Fetch credentials by site label (legacy, for Chrome extension)
@@ -109,7 +117,14 @@ app.get("/:site", async (c) => {
   }
 
   await logActivity(agent.id, agent.name, "credential_access", site);
-  return c.json({ site: cred.site, url: cred.url, email: cred.email, password: cred.password });
+
+  let siteResponseEmail = cred.email;
+  if (cred.useAgentEmail) {
+    const mailbox = await getAgentMailbox(agent.id);
+    if (mailbox) siteResponseEmail = mailbox;
+  }
+
+  return c.json({ site: cred.site, url: cred.url, email: siteResponseEmail, password: cred.password });
 });
 
 export default app;

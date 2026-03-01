@@ -15,6 +15,7 @@ export interface Credential {
   url: string;
   email: string;
   password: string;
+  useAgentEmail: boolean;
   createdAt: string;
 }
 
@@ -74,6 +75,11 @@ export async function initDatabase() {
   // Migration: add url column if missing
   await sql`
     ALTER TABLE credentials ADD COLUMN IF NOT EXISTS url TEXT NOT NULL DEFAULT ''
+  `;
+
+  // Migration: add use_agent_email column if missing
+  await sql`
+    ALTER TABLE credentials ADD COLUMN IF NOT EXISTS use_agent_email BOOLEAN NOT NULL DEFAULT FALSE
   `;
 
   // Drop old unique constraint on site if it exists (url is now the key identifier)
@@ -183,6 +189,7 @@ function rowToCredential(row: Record<string, unknown>): Credential {
     url: (row.url as string) || "",
     email: row.email as string,
     password: row.password as string,
+    useAgentEmail: row.use_agent_email as boolean,
     createdAt: (row.created_at as Date).toISOString(),
   };
 }
@@ -221,39 +228,59 @@ export async function findAgentByApiKey(apiKey: string): Promise<Agent | undefin
   return rows.length > 0 ? rowToAgent(rows[0]) : undefined;
 }
 
+export async function updateAgent(
+  id: string,
+  updates: { name?: string }
+): Promise<Agent> {
+  const rows = await sql`
+    UPDATE agents SET
+      name = COALESCE(${updates.name ?? null}, name)
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  if (rows.length === 0) throw new Error("Agent not found");
+  return rowToAgent(rows[0]);
+}
+
+export async function deleteAgent(id: string): Promise<void> {
+  await sql`DELETE FROM agents WHERE id = ${id}`;
+}
+
 // --- Credential operations ---
 
-export async function storeCredential(site: string, url: string, email: string, password: string): Promise<Credential> {
+export async function storeCredential(site: string, url: string, email: string, password: string, useAgentEmail: boolean = false): Promise<Credential> {
   const id = crypto.randomUUID();
   const rows = await sql`
-    INSERT INTO credentials (id, site, url, email, password, created_at)
-    VALUES (${id}, ${site}, ${url}, ${email}, ${password}, NOW())
+    INSERT INTO credentials (id, site, url, email, password, use_agent_email, created_at)
+    VALUES (${id}, ${site}, ${url}, ${email}, ${password}, ${useAgentEmail}, NOW())
     RETURNING *
   `;
   return rowToCredential(rows[0]);
 }
 
 export async function listCredentials(): Promise<Omit<Credential, "password">[]> {
-  const rows = await sql`SELECT id, site, url, email, created_at FROM credentials ORDER BY created_at`;
+  const rows = await sql`SELECT id, site, url, email, use_agent_email, created_at FROM credentials ORDER BY created_at`;
   return rows.map((row) => ({
     id: row.id as string,
     site: row.site as string,
     url: (row.url as string) || "",
     email: row.email as string,
+    useAgentEmail: row.use_agent_email as boolean,
     createdAt: (row.created_at as Date).toISOString(),
   }));
 }
 
 export async function updateCredential(
   id: string,
-  updates: { site?: string; url?: string; email?: string; password?: string }
+  updates: { site?: string; url?: string; email?: string; password?: string; useAgentEmail?: boolean }
 ): Promise<Credential> {
   const rows = await sql`
     UPDATE credentials SET
       site = COALESCE(${updates.site ?? null}, site),
       url = COALESCE(${updates.url ?? null}, url),
       email = COALESCE(${updates.email ?? null}, email),
-      password = COALESCE(${updates.password ?? null}, password)
+      password = COALESCE(${updates.password ?? null}, password),
+      use_agent_email = COALESCE(${updates.useAgentEmail ?? null}, use_agent_email)
     WHERE id = ${id}
     RETURNING *
   `;
@@ -403,6 +430,20 @@ export async function getOAuthConnection(id: string): Promise<OAuthConnection | 
 
 export async function deleteOAuthConnection(id: string): Promise<void> {
   await sql`DELETE FROM oauth_connections WHERE id = ${id}`;
+}
+
+export async function updateOAuthConnection(
+  id: string,
+  updates: { label?: string }
+): Promise<OAuthConnection> {
+  const rows = await sql`
+    UPDATE oauth_connections SET
+      label = COALESCE(${updates.label ?? null}, label)
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  if (rows.length === 0) throw new Error("OAuth connection not found");
+  return rowToOAuthConnection(rows[0]);
 }
 
 // --- Agent-OAuth linking ---

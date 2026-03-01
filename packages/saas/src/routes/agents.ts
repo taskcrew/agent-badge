@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import {
   createAgent,
   listAgents,
+  updateAgent,
+  deleteAgent,
   findAgentByApiKey,
   linkAgentCredential,
   unlinkAgentCredential,
@@ -41,6 +43,25 @@ app.get("/", async (c) => {
     }))
   );
   return c.json(result);
+});
+
+// PATCH /agents/:id - Update an agent
+app.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { name } = body;
+  if (!name || typeof name !== "string") {
+    return c.json({ error: "name is required" }, 400);
+  }
+  const agent = await updateAgent(id, { name });
+  return c.json(agent);
+});
+
+// DELETE /agents/:id - Delete an agent and all cascaded data
+app.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  await deleteAgent(id);
+  return c.json({ deleted: true });
 });
 
 // POST /agents/:id/links - Link agent to a credential
