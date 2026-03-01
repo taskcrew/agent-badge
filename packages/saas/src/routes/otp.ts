@@ -91,12 +91,17 @@ app.post("/fetch", async (c) => {
       return c.json({ success: false, error: "No OTP email found" });
     }
 
-    // Check recent messages (within last 5 minutes)
-    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    // Sort newest-first so we always check the latest OTP email
+    const sorted = [...listResponse.messages].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
-    for (const msgItem of listResponse.messages) {
+    // Only consider messages from the last 2 minutes to avoid stale codes
+    const twoMinAgo = Date.now() - 2 * 60 * 1000;
+
+    for (const msgItem of sorted) {
       const msgTime = new Date(msgItem.timestamp).getTime();
-      if (msgTime < fiveMinAgo) continue;
+      if (msgTime < twoMinAgo) continue;
 
       // First check subject and preview from list response
       const quickTexts = [msgItem.subject || "", msgItem.preview || ""];

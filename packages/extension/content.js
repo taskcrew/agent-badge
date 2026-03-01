@@ -543,6 +543,7 @@
   // --- OTP verification tool registration ---
 
   let otpToolRegistered = false;
+  let otpInProgress = false;
 
   function registerOtpTool() {
     if (otpToolRegistered) return;
@@ -560,6 +561,13 @@
         required: []
       },
       execute: async () => {
+        // Prevent concurrent OTP fetches (duplicate tool calls)
+        if (otpInProgress) {
+          return { result: "OTP verification already in progress. Please wait for it to complete." };
+        }
+        otpInProgress = true;
+
+        try {
         if (!hasOtpForm()) {
           return { result: "No OTP input detected on this page." };
         }
@@ -600,6 +608,9 @@
         }
 
         return { result: "OTP filled successfully but no submit button found. The agent may need to click submit." };
+        } finally {
+          otpInProgress = false;
+        }
       }
     });
   }
@@ -642,6 +653,40 @@
         }
       } else {
         console.error("[Agent Badge] Could not find Google Sign-In button to click.");
+      }
+    }
+
+    // --- Manual OTP trigger (Ctrl+Shift+O) ---
+    if (e.ctrlKey && e.shiftKey && e.key === "O") {
+      console.log("[Agent Badge] Manual OTP trigger...");
+      if (!hasOtpForm()) {
+        console.error("[Agent Badge] No OTP form detected on this page.");
+        return;
+      }
+
+      console.log("[Agent Badge] Fetching OTP from backend (may take up to 15s)...");
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "FETCH_OTP" }, resolve);
+      });
+      console.log("[Agent Badge] OTP response:", response);
+
+      if (response?.success && response?.otp) {
+        const filled = fillOtp(response.otp);
+        if (filled) {
+          console.log("[Agent Badge] OTP filled successfully.");
+          await new Promise((r) => setTimeout(r, 100));
+          const submitBtn = findOtpSubmitButton();
+          if (submitBtn) {
+            submitBtn.click();
+            console.log("[Agent Badge] OTP submitted.");
+          } else {
+            console.log("[Agent Badge] OTP filled but no submit button found.");
+          }
+        } else {
+          console.error("[Agent Badge] Could not find OTP input to fill.");
+        }
+      } else {
+        console.error("[Agent Badge] Failed:", response?.error);
       }
     }
   });
