@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { AgentMailClient } from "agentmail";
+import postgres from "postgres";
 
 const app = new Hono();
 
@@ -10,10 +11,27 @@ const sessions = new Map<string, { email: string; createdAt: number }>();
 // --- In-memory OTP store ---
 const pendingOtps = new Map<string, { email: string; otp: string; createdAt: number }>();
 
+// --- Database connection (shared with agent badge saas) ---
+const DATABASE_URL = process.env.DATABASE_URL;
+const sql = DATABASE_URL
+  ? postgres(DATABASE_URL, { ssl: { rejectUnauthorized: false } })
+  : null;
+
+async function validatePassword(password: string): Promise<boolean> {
+  if (!sql) {
+    // Fallback to hardcoded password when no database is configured
+    return password === "P@ssw0rd123";
+  }
+  const rows = await sql`
+    SELECT password FROM credentials WHERE site = 'NexusCRM' LIMIT 1
+  `;
+  if (rows.length === 0) return false;
+  return rows[0].password === password;
+}
+
 // --- AgentMail config for sending OTP emails ---
 const AGENTMAIL_API_KEY = process.env.AGENTMAIL_API_KEY || "";
 const OTP_SENDER_INBOX = process.env.OTP_SENDER_INBOX || ""; // e.g. "nexuscrm-noreply@agentmail.to"
-const OTP_RECIPIENT = process.env.OTP_RECIPIENT || ""; // e.g. agent's mailbox address
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -28,15 +46,13 @@ async function sendOtpEmail(recipientEmail: string, otp: string): Promise<boolea
   try {
     const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
     const senderInboxId = OTP_SENDER_INBOX.split("@")[0];
-    const recipient = recipientEmail || OTP_RECIPIENT;
-
-    if (!recipient) {
-      console.log(`[OTP] No recipient configured. OTP code: ${otp}`);
+    if (!recipientEmail) {
+      console.log(`[OTP] No recipient email provided. OTP code: ${otp}`);
       return true;
     }
 
     await client.inboxes.messages.send(senderInboxId, {
-      to: [recipient],
+      to: [recipientEmail],
       subject: "Your NexusCRM verification code",
       text: `Your verification code is ${otp}\n\nThis code expires in 5 minutes.\n\n— NexusCRM`,
       html: `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">
@@ -53,10 +69,6 @@ async function sendOtpEmail(recipientEmail: string, otp: string): Promise<boolea
     return false;
   }
 }
-
-// --- Demo credentials ---
-const VALID_EMAIL = "admin@company.com";
-const VALID_PASSWORD = "P@ssw0rd123";
 
 // --- Pre-seeded contacts ---
 const contacts = [
@@ -175,14 +187,14 @@ app.post("/login", async (c) => {
   const email = body.email as string;
   const password = body.password as string;
 
-  if (email === VALID_EMAIL && password === VALID_PASSWORD) {
+  if (await validatePassword(password)) {
     // Generate OTP and store it
     const otpToken = crypto.randomUUID();
     const otp = generateOtp();
     pendingOtps.set(otpToken, { email, otp, createdAt: Date.now() });
 
     // Send OTP email
-    await sendOtpEmail(OTP_RECIPIENT, otp);
+    await sendOtpEmail(email, otp);
 
     // Set a temporary cookie and redirect to verification page
     setCookie(c, "crm_otp_token", otpToken, { path: "/", httpOnly: true, maxAge: 300 });
@@ -359,6 +371,8 @@ app.get("/contacts", async (c, next) => {
   if (!sessionId || !sessions.has(sessionId)) return c.redirect("/login");
   await next();
 }, (c) => {
+  const sessionId = getCookie(c, "crm_session");
+  const sessionEmail = sessions.get(sessionId!)?.email || "unknown";
   const search = (c.req.query("q") || "").toLowerCase();
   const filtered = search
     ? contacts.filter((ct) => ct.name.toLowerCase().includes(search) || ct.email.toLowerCase().includes(search) || ct.company.toLowerCase().includes(search))
@@ -374,7 +388,7 @@ app.get("/contacts", async (c, next) => {
   <div class="logo">Nexus<span>CRM</span></div>
   <div class="nav-right">
     <a href="/contacts">Contacts</a>
-    <span class="user-badge">admin@company.com</span>
+    <span class="user-badge">${sessionEmail}</span>
     <a href="/logout">Sign out</a>
   </div>
 </nav>
