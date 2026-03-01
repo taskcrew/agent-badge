@@ -37,8 +37,7 @@ app.post("/mailbox", async (c) => {
 
   const client = getMailClient();
   const inbox = await client.inboxes.create();
-  const localPart = inbox.inboxId.split("@")[0];
-  const inboxAddress = `${localPart}@agentmail.to`;
+  const inboxAddress = inbox.inboxId;
   await setAgentMailbox(agentId, inboxAddress);
 
   return c.json({ inboxAddress }, 201);
@@ -81,48 +80,54 @@ app.post("/fetch", async (c) => {
 
   const client = getMailClient();
 
-  // Extract inbox ID from address (e.g. "abc123@agentmail.to" → "abc123")
-  const inboxId = inboxAddress.split("@")[0];
+  const inboxId = inboxAddress;
 
-  // List recent messages from the inbox
-  const listResponse = await client.inboxes.messages.list(inboxId);
+  try {
+    // List recent messages from the inbox
+    const listResponse = await client.inboxes.messages.list(inboxId);
 
-  if (!listResponse.messages || listResponse.messages.length === 0) {
+    if (!listResponse.messages || listResponse.messages.length === 0) {
+      await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
+      return c.json({ success: false, error: "No OTP email found" });
+    }
+
+    // Check recent messages (within last 5 minutes)
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+
+    for (const msgItem of listResponse.messages) {
+      const msgTime = new Date(msgItem.timestamp).getTime();
+      if (msgTime < fiveMinAgo) continue;
+
+      // First check subject and preview from list response
+      const quickTexts = [msgItem.subject || "", msgItem.preview || ""];
+      for (const text of quickTexts) {
+        const otp = extractOtp(text);
+        if (otp) {
+          await logActivity(agent.id, agent.name, "otp_fetched", "email");
+          return c.json({ success: true, otp });
+        }
+      }
+
+      // Fetch full message for body content
+      const fullMsg = await client.inboxes.messages.get(inboxId, msgItem.messageId);
+      const bodyTexts = [fullMsg.text || "", fullMsg.html || ""];
+      for (const text of bodyTexts) {
+        const otp = extractOtp(text);
+        if (otp) {
+          await logActivity(agent.id, agent.name, "otp_fetched", "email");
+          return c.json({ success: true, otp });
+        }
+      }
+    }
+
     await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
     return c.json({ success: false, error: "No OTP email found" });
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[otp/fetch] AgentMail error for inbox ${inboxId}:`, err);
+    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
+    return c.json({ success: false, error: `Failed to fetch messages: ${detail}` }, 502);
   }
-
-  // Check recent messages (within last 5 minutes)
-  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-
-  for (const msgItem of listResponse.messages) {
-    const msgTime = new Date(msgItem.timestamp).getTime();
-    if (msgTime < fiveMinAgo) continue;
-
-    // First check subject and preview from list response
-    const quickTexts = [msgItem.subject || "", msgItem.preview || ""];
-    for (const text of quickTexts) {
-      const otp = extractOtp(text);
-      if (otp) {
-        await logActivity(agent.id, agent.name, "otp_fetched", "email");
-        return c.json({ success: true, otp });
-      }
-    }
-
-    // Fetch full message for body content
-    const fullMsg = await client.inboxes.messages.get(inboxId, msgItem.messageId);
-    const bodyTexts = [fullMsg.text || "", fullMsg.html || ""];
-    for (const text of bodyTexts) {
-      const otp = extractOtp(text);
-      if (otp) {
-        await logActivity(agent.id, agent.name, "otp_fetched", "email");
-        return c.json({ success: true, otp });
-      }
-    }
-  }
-
-  await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
-  return c.json({ success: false, error: "No OTP email found" });
 });
 
 export default app;
