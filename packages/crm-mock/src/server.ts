@@ -45,7 +45,7 @@ async function validatePassword(password: string): Promise<boolean> {
 
 // --- Resend config for sending OTP emails ---
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "onboarding@resend.dev";
+const OTP_FROM_EMAIL = process.env.OTP_FROM_EMAIL || "NexusCRM <noreply@agentbadge.cc>";
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
