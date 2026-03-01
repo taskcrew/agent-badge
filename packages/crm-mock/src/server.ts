@@ -19,14 +19,28 @@ const sql = DATABASE_URL
 
 async function validatePassword(password: string): Promise<boolean> {
   if (!sql) {
-    // Fallback to hardcoded password when no database is configured
+    console.log("[Auth] No DATABASE_URL, using hardcoded password fallback");
     return password === "P@ssw0rd123";
   }
-  const rows = await sql`
-    SELECT password FROM credentials WHERE site = 'NexusCRM' LIMIT 1
-  `;
-  if (rows.length === 0) return false;
-  return rows[0].password === password;
+  try {
+    // Match by URL (same logic as saas getCredentialByUrl) or by site name
+    const rows = await sql`
+      SELECT site, url, password FROM credentials
+      WHERE url LIKE 'https://agent-badge-crm%'
+         OR site = 'NexusCRM'
+      LIMIT 1
+    `;
+    if (rows.length === 0) {
+      console.log("[Auth] No NexusCRM credential found in database");
+      return false;
+    }
+    const match = rows[0].password === password;
+    console.log(`[Auth] DB credential: site=${rows[0].site} url=${rows[0].url} passwordMatch=${match}`);
+    return match;
+  } catch (err) {
+    console.error("[Auth] Database query failed, falling back to hardcoded password:", err);
+    return password === "P@ssw0rd123";
+  }
 }
 
 // --- AgentMail config for sending OTP emails ---
