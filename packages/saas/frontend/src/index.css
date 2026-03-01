@@ -660,6 +660,53 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
   color: var(--alert-red);
 }
 
+/* --- ROW ACTIONS --- */
+.row-action-btn {
+  background: transparent;
+  border: 1px solid var(--sys-cyan-dim);
+  color: var(--sys-cyan-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.row-action-btn:hover {
+  color: var(--sys-cyan);
+  border-color: var(--sys-cyan);
+  background: rgba(77, 243, 255, 0.1);
+}
+
+.row-action-btn.delete:hover {
+  color: var(--alert-red);
+  border-color: var(--alert-red);
+  background: rgba(255, 77, 77, 0.1);
+}
+
+.row-action-btn.save {
+  color: #00c853;
+  border-color: #00c853;
+}
+
+.row-action-btn.save:hover {
+  background: rgba(0, 200, 83, 0.1);
+}
+
+.row-action-btn.cancel {
+  color: var(--ink-muted);
+  border-color: var(--ink-muted);
+}
+
+.term-input.inline-edit {
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
 /* --- 1PASSWORD BADGE --- */
 .onepass-badge {
   border: 1px solid var(--sys-cyan);

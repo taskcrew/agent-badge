@@ -189,6 +189,26 @@ export async function listCredentials(): Promise<Omit<Credential, "password">[]>
   }));
 }
 
+export async function updateCredential(
+  id: string,
+  updates: { site?: string; email?: string; password?: string }
+): Promise<Credential> {
+  const rows = await sql`
+    UPDATE credentials SET
+      site = COALESCE(${updates.site ?? null}, site),
+      email = COALESCE(${updates.email ?? null}, email),
+      password = COALESCE(${updates.password ?? null}, password)
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  if (rows.length === 0) throw new Error("Credential not found");
+  return rowToCredential(rows[0]);
+}
+
+export async function deleteCredential(id: string): Promise<void> {
+  await sql`DELETE FROM credentials WHERE id = ${id}`;
+}
+
 export async function getCredentialBySite(site: string): Promise<Credential | undefined> {
   const rows = await sql`SELECT * FROM credentials WHERE site = ${site} LIMIT 1`;
   return rows.length > 0 ? rowToCredential(rows[0]) : undefined;

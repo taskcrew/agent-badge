@@ -9,11 +9,72 @@ interface Credential {
   createdAt: string;
 }
 
+function EditRow({
+  cred,
+  onSave,
+  onCancel,
+}: {
+  cred: Credential;
+  onSave: (id: string, updates: { site: string; email: string; password: string }) => void;
+  onCancel: () => void;
+}) {
+  const [site, setSite] = useState(cred.site);
+  const [email, setEmail] = useState(cred.email);
+  const [password, setPassword] = useState("");
+
+  const handleSave = () => {
+    const updates: Record<string, string> = {};
+    if (site !== cred.site) updates.site = site;
+    if (email !== cred.email) updates.email = email;
+    if (password) updates.password = password;
+    if (Object.keys(updates).length === 0) { onCancel(); return; }
+    onSave(cred.id, updates as any);
+  };
+
+  return (
+    <tr>
+      <td>
+        <input
+          type="text"
+          value={site}
+          onChange={(e) => setSite(e.target.value)}
+          className="term-input inline-edit"
+        />
+      </td>
+      <td>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="term-input inline-edit"
+        />
+      </td>
+      <td>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSave()}
+          placeholder="(unchanged)"
+          className="term-input inline-edit"
+        />
+      </td>
+      <td>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={handleSave} className="row-action-btn save">Save</button>
+          <button onClick={onCancel} className="row-action-btn cancel">Cancel</button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function Credentials() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [site, setSite] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const fetchCredentials = async () => {
     const res = await fetch(`${API}/credentials`);
@@ -32,6 +93,21 @@ export default function Credentials() {
     setSite("");
     setEmail("");
     setPassword("");
+    fetchCredentials();
+  };
+
+  const updateCred = async (id: string, updates: { site?: string; email?: string; password?: string }) => {
+    await fetch(`${API}/credentials/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    setEditingId(null);
+    fetchCredentials();
+  };
+
+  const deleteCred = async (id: string) => {
+    await fetch(`${API}/credentials/${id}`, { method: "DELETE" });
     fetchCredentials();
   };
 
@@ -82,22 +158,44 @@ export default function Credentials() {
               <th>Vault Node</th>
               <th>Identity String</th>
               <th>Secret</th>
-              <th>Linked</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {credentials.map((cred) => (
-              <tr key={cred.id}>
-                <td className="text-cyan">{cred.site.toUpperCase()}</td>
-                <td>{cred.email}</td>
-                <td style={{ color: "var(--sys-cyan-dim)", letterSpacing: "0.15em" }}>
-                  {"\u2022".repeat(12)}
-                </td>
-                <td style={{ color: "var(--sys-cyan-dim)" }}>
-                  {new Date(cred.createdAt).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
+            {credentials.map((cred) =>
+              editingId === cred.id ? (
+                <EditRow
+                  key={cred.id}
+                  cred={cred}
+                  onSave={updateCred}
+                  onCancel={() => setEditingId(null)}
+                />
+              ) : (
+                <tr key={cred.id}>
+                  <td className="text-cyan">{cred.site.toUpperCase()}</td>
+                  <td>{cred.email}</td>
+                  <td style={{ color: "var(--sys-cyan-dim)", letterSpacing: "0.15em" }}>
+                    {"\u2022".repeat(12)}
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={() => setEditingId(cred.id)}
+                        className="row-action-btn edit"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteCred(cred.id)}
+                        className="row-action-btn delete"
+                      >
+                        Del
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            )}
             {credentials.length === 0 && (
               <tr>
                 <td colSpan={4} className="empty-state">

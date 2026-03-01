@@ -6,6 +6,8 @@ import {
   findAgentByApiKey,
   logActivity,
   isAgentLinkedToSite,
+  updateCredential,
+  deleteCredential,
 } from "../store";
 
 const app = new Hono();
@@ -26,7 +28,32 @@ app.get("/", async (c) => {
   return c.json(await listCredentials());
 });
 
+// PATCH /credentials/:id - Update a credential
+app.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { site, email, password } = body;
+  if (!site && !email && !password) {
+    return c.json({ error: "At least one field (site, email, password) is required" }, 400);
+  }
+  try {
+    const cred = await updateCredential(id, { site, email, password });
+    return c.json({ id: cred.id, site: cred.site, email: cred.email, createdAt: cred.createdAt });
+  } catch {
+    return c.json({ error: "Credential not found" }, 404);
+  }
+});
+
+// DELETE /credentials/:id - Delete a credential
+app.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  await deleteCredential(id);
+  return c.json({ deleted: true });
+});
+
 // GET /credentials/:site - Fetch credentials for a site (requires API key + linking)
+// Note: this must come after /:id routes since Hono matches in order,
+// but the agent endpoint uses X-Agent-Key header to distinguish
 app.get("/:site", async (c) => {
   const apiKey = c.req.header("X-Agent-Key");
   if (!apiKey) {
