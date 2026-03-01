@@ -206,9 +206,7 @@ export default function Credentials() {
               <th>Target URL</th>
               <th>Identity</th>
               <th>Secret</th>
-              <th>Agent Email</th>
-              <th>Accesses</th>
-              <th>Last Used</th>
+              <th>Usage</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -225,24 +223,25 @@ export default function Credentials() {
                 <tr key={cred.id}>
                   <td className="text-cyan">{cred.site.toUpperCase()}</td>
                   <td style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)" }}>
-                    {cred.url || "—"}
+                    {cred.url || "\u2014"}
                   </td>
-                  <td>{cred.email}</td>
+                  <td>
+                    {cred.email}
+                    {cred.useAgentEmail && (
+                      <span style={{ color: "var(--sys-green)", fontSize: "0.65rem", marginLeft: 6, verticalAlign: "middle" }}>AGENT</span>
+                    )}
+                  </td>
                   <td style={{ color: "var(--sys-cyan-dim)", letterSpacing: "0.15em" }}>
                     {"\u2022".repeat(12)}
                   </td>
-                  <td>
-                    {cred.useAgentEmail && (
-                      <span style={{ color: "var(--sys-green)", fontSize: "0.8rem" }}>ON</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "center", color: "var(--sys-cyan-dim)" }}>
-                    {cred.accessCount}
-                  </td>
-                  <td style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)" }}>
-                    {cred.lastAccessed
-                      ? new Date(cred.lastAccessed).toLocaleDateString()
-                      : "Never"}
+                  <td style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)", whiteSpace: "nowrap" }}>
+                    <span>{cred.accessCount}x</span>
+                    <span style={{ margin: "0 4px", opacity: 0.4 }}>/</span>
+                    <span style={{ fontSize: "0.75rem" }}>
+                      {cred.lastAccessed
+                        ? new Date(cred.lastAccessed).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                        : "never"}
+                    </span>
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -265,7 +264,7 @@ export default function Credentials() {
             )}
             {credentials.length === 0 && (
               <tr>
-                <td colSpan={8} className="empty-state">
+                <td colSpan={6} className="empty-state">
                   NO VAULT NODES LINKED
                 </td>
               </tr>
