@@ -244,27 +244,18 @@
         "The extension handles authentication securely — credentials never appear in the response.",
       inputSchema: {
         type: "object",
-        properties: {
-          site: {
-            type: "string",
-            description: "Optional site label hint (e.g. 'crm', 'github'). If omitted, credentials are matched by the current page URL."
-          }
-        },
+        properties: {},
         required: []
       },
-      execute: async (input) => {
-        const site = input.site || "";
-        const url = window.location.origin;
-
+      execute: async () => {
         if (!hasLoginForm()) {
           return { result: "No login form detected on this page." };
         }
 
-        // Ask background.js to fetch credentials from the SaaS backend
-        // Pass both URL (primary) and site label (fallback)
+        // Ask background.js to fetch credentials by current page URL
         const response = await new Promise((resolve) => {
           chrome.runtime.sendMessage(
-            { type: "FETCH_CREDENTIALS", site, url },
+            { type: "FETCH_CREDENTIALS", url: window.location.origin },
             resolve
           );
         });
@@ -619,7 +610,7 @@
       console.log("[Agent Badge] Manual login trigger...");
       const response = await new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          { type: "FETCH_CREDENTIALS", site: "crm", url: window.location.origin },
+          { type: "FETCH_CREDENTIALS", url: window.location.origin },
           resolve
         );
       });
@@ -640,17 +631,15 @@
         return;
       }
 
-      // Try direct POST first
-      const postResult = await tryDirectPost("default");
-      if (postResult) {
-        console.log("[Agent Badge] Direct POST result:", postResult);
-        return;
-      }
-
-      // Fall back to clicking the button
-      console.log("[Agent Badge] Direct POST not available, clicking button...");
+      // Click the Google Sign-In button directly
       if (clickGoogleSignInButton()) {
-        console.log("[Agent Badge] Clicked Google Sign-In button.");
+        console.log("[Agent Badge] Clicked Google Sign-In button, waiting for success...");
+        const result = await waitForSignInSuccess(8000);
+        if (result) {
+          console.log("[Agent Badge] Sign-in succeeded:", result);
+        } else {
+          console.log("[Agent Badge] Sign-in not confirmed within timeout (popup may still be open).");
+        }
       } else {
         console.error("[Agent Badge] Could not find Google Sign-In button to click.");
       }
