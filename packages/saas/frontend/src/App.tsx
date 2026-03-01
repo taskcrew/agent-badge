@@ -59,8 +59,12 @@ export default function App() {
         ))}
 
         <button className="print-btn" onClick={() => {
-          const el = document.querySelector<HTMLInputElement>('.term-input');
-          el?.focus();
+          setPage("agents");
+          setTimeout(() => {
+            const el = document.querySelector<HTMLInputElement>('.term-input');
+            el?.focus();
+            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 50);
         }}>
           Print New Badge
         </button>
