@@ -1,6 +1,6 @@
-import index from "../frontend/index.html";
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
+import { serveStatic } from "hono/bun";
 import { BrowserUse } from "browser-use-sdk";
 
 const DASHBOARD_USER = process.env.DASHBOARD_USER || "admin";
@@ -37,13 +37,7 @@ function generateId(): string {
 
 const app = new Hono();
 
-const auth = basicAuth({ username: DASHBOARD_USER, password: DASHBOARD_PASS });
-
-// Auth on everything except bundled assets (hashed filenames under /_bun/)
-app.use("*", async (c, next) => {
-  if (c.req.path.startsWith("/_bun/")) return next();
-  return auth(c, next);
-});
+app.use("*", basicAuth({ username: DASHBOARD_USER, password: DASHBOARD_PASS }));
 
 app.post("/api/execute", async (c) => {
   const { prompt } = await c.req.json();
@@ -88,31 +82,20 @@ app.get("/api/sessions", (c) => {
   return c.json(list);
 });
 
-// SPA fallback — serve the bundled HTML for any non-API route
-app.get("*", async (c) => {
-  return new Response(Bun.file(index.index), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
-});
+// Serve static frontend files (bun build output)
+app.use("/*", serveStatic({ root: "./frontend/dist" }));
 
-// ---------- Bun server ----------
+// SPA fallback — serve index.html for non-API routes
+app.get("*", serveStatic({ root: "./frontend/dist", path: "index.html" }));
 
-const server = Bun.serve({
-  port: process.env.PORT || 3100,
+// ---------- server ----------
 
-  // HTML import registers the frontend bundle so /_bun/* assets are served
-  routes: {
-    "/_bun/*": index,
-  },
+const port = parseInt(process.env.PORT || "3100", 10);
 
-  // Hono handles everything else (with basic auth)
+export default {
+  port,
   fetch: app.fetch,
-
-  development: process.env.NODE_ENV !== "production" && {
-    hmr: true,
-    console: true,
-  },
-});
+};
 
 // ---------- agent runner ----------
 
@@ -165,4 +148,4 @@ async function resolveAndSetLiveUrl(run: ReturnType<typeof client.run>, session:
   }
 }
 
-console.log(`Runner listening on http://localhost:${server.port}`);
+console.log(`Runner listening on port ${port}`);
