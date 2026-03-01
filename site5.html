@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Badge - Hardware Playground</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* V2 Terminal Background */
+            --bg-deep: #020c17;
+            --sys-cyan: #4df3ff;
+            --sys-cyan-dim: #1e6c7a;
+            
+            /* V3 Physical "Creamy" Plastics & Metals */
+            --cream-base: #e8ecef;
+            --cream-shadow: #b0bfc6;
+            --metal-base: #3a4750;
+            --metal-dark: #1e262b;
+            --danger-red: #d93829;
+            --safe-green: #2d8a56;
+            --led-off: #111820;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image: radial-gradient(circle at 50% 50%, rgba(77, 243, 255, 0.05) 0%, transparent 60%), linear-gradient(rgba(10, 46, 56, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(10, 46, 56, 0.5) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            color: var(--sys-cyan);
+            min-height: 100vh;
+            padding: 3rem;
+        }
+
+        /* Subtle Scanlines */
+        body::after {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px);
+            pointer-events: none; z-index: 100;
+        }
+
+        h1 { margin-bottom: 2rem; font-family: 'IBM Plex Mono', monospace; border-bottom: 2px solid var(--sys-cyan); padding-bottom: 1rem; }
+
+        .workbench {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 3rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Generic Physical Container */
+        .hardware-module {
+            background: var(--cream-base);
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: inset 2px 2px 4px #fff, inset -2px -2px 6px var(--cream-shadow), 15px 15px 30px rgba(0,0,0,0.6);
+            color: #111;
+        }
+        .module-title { font-size: 0.85rem; text-transform: uppercase; color: #5a646e; margin-bottom: 20px; font-weight: 800; border-bottom: 2px solid var(--cream-shadow); padding-bottom: 5px; }
+
+        /* 1. CARD READER EXTENSION */
+        .card-reader { background: var(--metal-base); color: #fff; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2), inset -2px -2px 10px #000, 10px 10px 20px rgba(0,0,0,0.8); }
+        .reader-slot {
+            height: 12px; background: #000; border-radius: 10px; margin-bottom: 25px;
+            box-shadow: inset 0px 5px 10px rgba(0,0,0,1), 0px 1px 0px rgba(255,255,255,0.2);
+        }
+        .led-array { display: flex; gap: 15px; justify-content: center; margin-bottom: 20px; background: var(--metal-dark); padding: 10px; border-radius: 4px; box-shadow: inset 2px 2px 5px #000; }
+        .led { width: 16px; height: 16px; border-radius: 50%; background: var(--led-off); border: 2px solid #000; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8); transition: all 0.2s; }
+        .led.yellow.active { background: #ffcc00; box-shadow: 0 0 10px #ffcc00, inset 2px 2px 5px rgba(255,255,255,0.8); }
+        .led.green.active { background: var(--safe-green); box-shadow: 0 0 15px var(--safe-green), inset 2px 2px 5px rgba(255,255,255,0.8); }
+        .led.red.active { background: var(--danger-red); box-shadow: 0 0 15px var(--danger-red), inset 2px 2px 5px rgba(255,255,255,0.8); }
+        .action-btn { background: var(--cream-base); color: #111; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; box-shadow: inset 2px 2px 0px #fff, inset -2px -2px 0px var(--cream-shadow); width: 100%; text-transform: uppercase; }
+        .action-btn:active { box-shadow: inset 2px 2px 4px var(--cream-shadow); transform: translateY(1px); }
+
+        /* 2. TAMPER EVIDENT SHUTTER */
+        .key-container { position: relative; background: var(--metal-dark); padding: 15px; border-radius: 4px; box-shadow: inset 3px 3px 10px #000; overflow: hidden; margin-top: 20px; display: flex; align-items: center; }
+        .raw-key { font-family: 'IBM Plex Mono', monospace; color: var(--safe-green); letter-spacing: 2px; text-shadow: 0 0 5px var(--safe-green); z-index: 1; position: relative; }
+        
+        /* Using a range input customized to look like a plastic slider */
+        input[type=range].shutter-slider {
+            -webkit-appearance: none; appearance: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent; z-index: 5; margin: 0; cursor: grab;
+        }
+        input[type=range].shutter-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 100%; width: 50px;
+            background: repeating-linear-gradient(90deg, var(--metal-base), var(--metal-base) 2px, var(--metal-dark) 2px, var(--metal-dark) 4px);
+            border-right: 2px solid #000;
+            box-shadow: 2px 0px 10px rgba(0,0,0,0.8);
+            cursor: ew-resize;
+        }
+        /* Cover element linked to slider via JS */
+        .shutter-cover {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--metal-base); z-index: 4; border-right: 2px solid #000;
+            display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 0.8rem; letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        /* 3. THE SEVER PROTOCOL */
+        .sever-station { display: flex; gap: 20px; align-items: center; }
+        .switch-housing { position: relative; width: 80px; height: 120px; background: var(--metal-base); border-radius: 4px; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2), inset -2px -2px 10px #000; display: flex; align-items: center; justify-content: center; perspective: 400px; }
+        /* Safety Cover */
+        .safety-cover {
+            position: absolute; top: -5px; left: -5px; right: -5px; height: 130px;
+            background: rgba(217, 56, 41, 0.4); border: 2px solid var(--danger-red); border-radius: 4px;
+            backdrop-filter: blur(2px); z-index: 10; cursor: pointer;
+            transform-origin: top; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: inset 2px 2px 5px rgba(255,255,255,0.4), 0 5px 15px rgba(217, 56, 41, 0.5);
+            display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; color: #fff; font-weight: bold; font-size: 0.7rem; text-shadow: 1px 1px 0 #000;
+        }
+        .safety-cover.open { transform: rotateX(105deg); background: rgba(217, 56, 41, 0.2); }
+        /* Actual Switch */
+        .toggle-switch { width: 20px; height: 50px; background: linear-gradient(90deg, #ccc, #fff, #999); border-radius: 10px; box-shadow: 2px 5px 10px #000; cursor: pointer; transition: transform 0.1s; transform: translateY(15px) rotateX(-20deg); }
+        .toggle-switch.flipped { transform: translateY(-15px) rotateX(20deg); background: linear-gradient(90deg, #999, #ccc, #666); }
+        
+        .sever-target { flex: 1; background: #fff; padding: 15px; border: 2px solid var(--cream-shadow); position: relative; overflow: hidden; }
+        .void-stamp { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg) scale(2); color: var(--danger-red); font-size: 2rem; font-weight: 800; border: 4px solid var(--danger-red); padding: 5px 10px; opacity: 0; pointer-events: none; transition: all 0.1s; mix-blend-mode: multiply; }
+        .void-stamp.stamped { opacity: 0.8; transform: translate(-50%, -50%) rotate(-15deg) scale(1); }
+
+        /* 4. DOT MATRIX PAPER FEED */
+        .printer-housing { background: var(--metal-base); padding: 10px; border-radius: 4px; box-shadow: inset 0 0 20px #000; height: 200px; overflow: hidden; position: relative; }
+        .paper-feed {
+            background-color: #f4f1ea; min-height: 100%;
+            background-image: repeating-linear-gradient(transparent, transparent 24px, rgba(45, 138, 86, 0.1) 24px, rgba(45, 138, 86, 0.1) 48px);
+            border-left: 20px solid #e0ddd3; border-right: 20px solid #e0ddd3;
+            position: relative; padding: 10px 15px; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: #222;
+            display: flex; flex-direction: column; justify-content: flex-end; transition: transform 0.1s linear;
+        }
+        /* Tractor Holes */
+        .paper-feed::before, .paper-feed::after {
+            content: ""; position: absolute; top: 0; bottom: 0; width: 10px;
+            background-image: radial-gradient(circle, #000 40%, transparent 45%); background-size: 10px 24px;
+        }
+        .paper-feed::before { left: -15px; } .paper-feed::after { right: -15px; }
+        .log-line { margin-bottom: 8px; line-height: 16px; opacity: 0.9; text-transform: uppercase; }
+
+        /* 5. THE PATCH CABLE */
+        .patch-board { display: flex; align-items: center; justify-content: space-between; background: var(--metal-dark); padding: 20px; border-radius: 4px; box-shadow: inset 2px 2px 10px #000; position: relative; overflow: hidden; }
+        /* The Port */
+        .port { width: 60px; height: 60px; border-radius: 50%; background: #111; border: 4px solid var(--metal-base); box-shadow: inset 0 0 15px #000, 0 0 0 2px #000; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; }
+        .port-pins { width: 30px; height: 30px; background: radial-gradient(circle, #555 2px, transparent 3px); background-size: 8px 8px; border-radius: 50%; }
+        /* The Cable */
+        .cable-head { width: 70px; height: 50px; background: linear-gradient(to bottom, #555, #333); border-radius: 10px 0 0 10px; position: absolute; right: -80px; top: 25px; display: flex; align-items: center; justify-content: flex-start; padding-left: 5px; box-shadow: -5px 5px 10px rgba(0,0,0,0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 3; }
+        .cable-head::after { content: ""; position: absolute; right: -100px; width: 100px; height: 20px; background: repeating-linear-gradient(90deg, #222, #222 4px, #111 4px, #111 8px); }
+        .cable-pins { width: 15px; height: 30px; background: silver; border-radius: 3px 0 0 3px; }
+        
+        .patch-board.connected .cable-head { transform: translateX(-160px); }
+        .patch-board.connected .port-light { background: var(--safe-green); box-shadow: 0 0 10px var(--safe-green); }
+        .port-light { position: absolute; top: 10px; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger-red); border: 1px solid #000; transition: 0.3s; z-index: 5; }
+
+    </style>
+</head>
+<body>
+
+    <h1>> AgentBadge / HARDWARE_TEST_RIG</h1>
+
+    <div class="workbench">
+
+        <div class="hardware-module card-reader">
+            <div class="module-title" style="color: #88929c; border-color: #222;">Peripheral: Ext_Reader</div>
+            <div class="reader-slot"></div>
+            <div class="led-array">
+                <div class="led red" id="led-red"></div>
+                <div class="led yellow" id="led-yellow"></div>
+                <div class="led green" id="led-green"></div>
+            </div>
+            <button class="action-btn" onclick="simulateSwipe()">Simulate Swipe Request</button>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; text-align: center; margin-top: 15px; color: #88929c;">AWAITING HANDSHAKE...</div>
+        </div>
+
+        <div class="hardware-module">
+            <div class="module-title">Component: Privacy_Shutter</div>
+            <p style="font-size: 0.85rem; color: #5a646e; margin-bottom: 10px;">Drag physical slider to expose API key.</p>
+            <div class="key-container">
+                <div class="raw-key">AK_LIVE_98XQ2P5L</div>
+                <div class="shutter-cover" id="shutter-cover">PROTECTED_DATA</div>
+                <input type="range" min="0" max="100" value="0" class="shutter-slider" id="shutter-slider" oninput="slideShutter()" onchange="releaseShutter()" onmouseup="releaseShutter()">
+            </div>
+        </div>
+
+        <div class="hardware-module">
+            <div class="module-title">Component: Sever_Toggle</div>
+            <div class="sever-station">
+                <div class="switch-housing">
+                    <div class="safety-cover" id="safety-cover" onclick="openCover()">LIFT TO ARM</div>
+                    <div class="toggle-switch" id="sever-switch" onclick="triggerSever()"></div>
+                </div>
+                <div class="sever-target" id="sever-badge">
+                    <div style="font-weight: 800; margin-bottom: 5px;">Agent: Support-Bot</div>
+                    <div style="font-size: 0.8rem; color: #5a646e; font-family: monospace;">STATUS: ACTIVE<br>ID: 0x9B32E</div>
+                    <div class="void-stamp" id="void-stamp">VOID</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hardware-module">
+            <div class="module-title">Component: Impact_Printer</div>
+            <div class="printer-housing">
+                <div class="paper-feed" id="paper-feed">
+                    <div class="log-line">SYSTEM BOOT... OK</div>
+                    <div class="log-line">AWAITING LOGS...</div>
+                </div>
+            </div>
+            <button class="action-btn" style="margin-top: 15px;" onclick="printLog()">Print Audit Event</button>
+        </div>
+
+        <div class="hardware-module">
+            <div class="module-title">Component: Vault_Patch_Bay</div>
+            <div class="patch-board" id="patch-board">
+                <div class="port-light"></div>
+                <div class="port"><div class="port-pins"></div></div>
+                <div style="z-index: 1; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: #88929c;">NODE:<br>1PASSWORD</div>
+                <div class="cable-head"><div class="cable-pins"></div></div>
+            </div>
+            <button class="action-btn" style="margin-top: 15px;" id="patch-btn" onclick="togglePatch()">Establish Link</button>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Card Reader Logic
+        function simulateSwipe() {
+            const y = document.getElementById('led-yellow');
+            const g = document.getElementById('led-green');
+            const r = document.getElementById('led-red');
+            
+            // Reset
+            y.classList.remove('active'); g.classList.remove('active'); r.classList.remove('active');
+            
+            // Processing
+            y.classList.add('active');
+            
+            setTimeout(() => {
+                y.classList.remove('active');
+                // Random success/fail
+                if(Math.random() > 0.3) {
+                    g.classList.add('active');
+                    new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YTEAAAAA//8AAAD//w==').play().catch(e=>console.log("Audio blip requires interaction")); // Fake tiny click
+                } else {
+                    r.classList.add('active');
+                }
+            }, 800);
+        }
+
+        // 2. Tamper Shutter Logic
+        function slideShutter() {
+            const val = document.getElementById('shutter-slider').value;
+            // Move the cover based on slider value
+            document.getElementById('shutter-cover').style.transform = `translateX(${val}%)`;
+        }
+        function releaseShutter() {
+            const slider = document.getElementById('shutter-slider');
+            const cover = document.getElementById('shutter-cover');
+            // Snap back
+            slider.value = 0;
+            cover.style.transition = 'transform 0.2s ease-out';
+            cover.style.transform = `translateX(0%)`;
+            setTimeout(() => cover.style.transition = 'none', 200);
+        }
+
+        // 3. Sever Protocol Logic
+        let coverOpen = false;
+        function openCover() {
+            const cover = document.getElementById('safety-cover');
+            cover.classList.toggle('open');
+            coverOpen = !coverOpen;
+            if(!coverOpen) cover.innerText = "LIFT TO ARM";
+            else cover.innerText = "";
+        }
+        function triggerSever() {
+            if(!coverOpen) { alert("Lift the safety cover first."); return; }
+            
+            document.getElementById('sever-switch').classList.add('flipped');
+            document.getElementById('void-stamp').classList.add('stamped');
+            document.getElementById('sever-badge').style.filter = 'grayscale(100%)';
+            document.getElementById('sever-badge').style.opacity = '0.7';
+        }
+
+        // 4. Dot Matrix Logic
+        const events = [
+            "AUTH: SCRAPER-ALPHA -> X_SOCIAL",
+            "DENY: TEST-RUN-01 -> STRIPE_PRD",
+            "LINK: SUPPORT-BOT -> ZENDESK",
+            "SYS: MANIFEST REFRESH OK"
+        ];
+        function printLog() {
+            const feed = document.getElementById('paper-feed');
+            const newLine = document.createElement('div');
+            newLine.className = 'log-line';
+            
+            const text = `${new Date().toLocaleTimeString('en-US', {hour12:false})} | ${events[Math.floor(Math.random() * events.length)]}`;
+            feed.appendChild(newLine);
+            
+            // Typewriter effect
+            let i = 0;
+            const timer = setInterval(() => {
+                newLine.innerText += text.charAt(i);
+                i++;
+                // Tiny paper feed bump
+                feed.style.transform = `translateY(${Math.random() * 2}px)`;
+                if(i >= text.length) {
+                    clearInterval(timer);
+                    feed.style.transform = `translateY(0)`;
+                }
+            }, 30);
+        }
+
+        // 5. Patch Cable Logic
+        let isConnected = false;
+        function togglePatch() {
+            const board = document.getElementById('patch-board');
+            const btn = document.getElementById('patch-btn');
+            
+            if(!isConnected) {
+                board.classList.add('connected');
+                btn.innerText = "Sever Link";
+            } else {
+                board.classList.remove('connected');
+                btn.innerText = "Establish Link";
+            }
+            isConnected = !isConnected;
+        }
+    </script>
+</body>
+</html>

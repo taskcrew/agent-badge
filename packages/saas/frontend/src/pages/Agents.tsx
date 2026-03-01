@@ -40,7 +40,7 @@ function Barcode({ seed }: { seed: string }) {
           </div>
         ))}
       </div>
-      <div className="barcode-label">{hex} // BADGE_OS</div>
+      <div className="barcode-label">{hex} // AgentBadge</div>
     </>
   );
 }
@@ -465,7 +465,7 @@ export default function Agents() {
             <Barcode seed={agent.id} />
 
             <div className="badge-footer">
-              <span className="badge-footer-text">AGENT BADGE // BADGE_OS v2.1</span>
+              <span className="badge-footer-text">AGENT BADGE // AgentBadge v2.1</span>
               <span className="badge-footer-text">
                 {new Date(agent.createdAt).toLocaleDateString()}
               </span>

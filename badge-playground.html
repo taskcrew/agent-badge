@@ -765,7 +765,7 @@ function buildCorporateBadge(s, statusColor, statusLabel, isRevoked) {
         ${state.barcode ? buildBarcode(s) : ''}
 
         <div style="padding:6px 16px 12px; display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.6rem; color:${s.inkMuted}; letter-spacing:0.15em;">ACME CORP // BADGE_OS v2.1</span>
+            <span style="font-size:0.6rem; color:${s.inkMuted}; letter-spacing:0.15em;">ACME CORP // AgentBadge v2.1</span>
             ${state.waves ? `<div class="contactless-waves ${state.breathe ? 'animating' : ''}" style="color:${s.accentDim};">
                 <div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
             </div>` : ''}
@@ -869,7 +869,7 @@ function buildCACCard(s, statusColor, statusLabel, isRevoked) {
 
         <!-- Microprint band -->
         <div style="padding:3px 16px; font-size:0.35rem; color:${s.cardShadow}; letter-spacing:0.3em; line-height:1; overflow:hidden; white-space:nowrap;">
-            ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-BADGE-OS-V2-ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-BADGE-OS-V2-ACME-CORP
+            ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-AgentBadge-V2-ACME-CORP-SEC-DIVISION-CAC-AUTHENTICATED-AgentBadge-V2-ACME-CORP
         </div>
 
         ${state.barcode ? buildBarcode(s) : ''}
@@ -984,7 +984,7 @@ function buildBarcode(s) {
             <div style="display:flex; align-items:stretch; height:24px; gap:0;">
                 ${bars.join('')}
             </div>
-            <div style="font-size:0.5rem; color:${s.inkMuted}; letter-spacing:0.3em; margin-top:2px; font-family:monospace;">0x137056 // BADGE_OS</div>
+            <div style="font-size:0.5rem; color:${s.inkMuted}; letter-spacing:0.3em; margin-top:2px; font-family:monospace;">0x137056 // AgentBadge</div>
         </div>
     `;
 }
