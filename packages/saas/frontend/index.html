@@ -7,7 +7,24 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   </head>
   <body>
+    <div id="elevator-overlay">
+      <div class="elevator-door left"></div>
+      <div class="elevator-door right"></div>
+      <button id="elevator-enter" type="button">ENTER</button>
+    </div>
+    <audio id="elevator-ding" src="/ding.mp3" preload="auto"></audio>
     <div id="root"></div>
+    <script>
+      document.getElementById('elevator-enter').addEventListener('click', function() {
+        this.style.display = 'none';
+        document.getElementById('elevator-ding').play();
+        document.getElementById('elevator-overlay').classList.add('opening');
+        setTimeout(function() {
+          var el = document.getElementById('elevator-overlay');
+          if (el) el.remove();
+        }, 3000);
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
