@@ -21,19 +21,23 @@ function App() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
   // Poll sessions while any are running
   useEffect(() => {
     fetchSessions();
 
     pollRef.current = setInterval(() => {
-      const hasRunning = sessions.some((s) => s.status === "running");
-      if (hasRunning) fetchSessions();
+      if (sessionsRef.current.some((s) => s.status === "running")) {
+        fetchSessions();
+      }
     }, 2000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [sessions.some((s) => s.status === "running")]);
+  }, []);
 
   async function fetchSessions() {
     try {
@@ -75,6 +79,8 @@ function App() {
     });
   }
 
+  const activeSession = expandedId ? sessions.find((s) => s.id === expandedId) : null;
+
   return (
     <div className="runner-app">
       <header className="runner-header">
@@ -82,104 +88,119 @@ function App() {
         <span className="tag">browser-use</span>
       </header>
 
-      <form className="prompt-form" onSubmit={handleSubmit}>
-        <label htmlFor="prompt-input">Prompt</label>
-        <textarea
-          id="prompt-input"
-          className="prompt-textarea"
-          placeholder="Enter a task for the browser agent...&#10;&#10;e.g. Go to news.ycombinator.com and tell me the top 3 stories"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              handleSubmit(e);
-            }
-          }}
-        />
-        <button className="submit-btn" type="submit" disabled={!prompt.trim() || submitting}>
-          {submitting ? "Launching..." : "Execute"}
-        </button>
-      </form>
+      <div className="runner-body">
+        <div className="left-panel">
+          <form className="prompt-form" onSubmit={handleSubmit}>
+            <label htmlFor="prompt-input">Prompt</label>
+            <textarea
+              id="prompt-input"
+              className="prompt-textarea"
+              placeholder="Enter a task for the browser agent...&#10;&#10;e.g. Go to news.ycombinator.com and tell me the top 3 stories"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  handleSubmit(e);
+                }
+              }}
+            />
+            <button className="submit-btn" type="submit" disabled={!prompt.trim() || submitting}>
+              {submitting ? "Launching..." : "Execute"}
+            </button>
+          </form>
 
-      <section className="sessions-section">
-        <div className="sessions-header">
-          Sessions {sessions.length > 0 && `(${sessions.length})`}
-        </div>
+          <section className="sessions-section">
+            <div className="sessions-header">
+              Sessions {sessions.length > 0 && `(${sessions.length})`}
+            </div>
 
-        {sessions.length === 0 && (
-          <div className="empty-state">No sessions yet. Submit a prompt to start.</div>
-        )}
+            {sessions.length === 0 && (
+              <div className="empty-state">No sessions yet. Submit a prompt to start.</div>
+            )}
 
-        {sessions.map((s) => {
-          const isExpanded = expandedId === s.id;
-          return (
-            <div
-              key={s.id}
-              className={`session-card${isExpanded ? " expanded" : ""}`}
-              onClick={() => setExpandedId(isExpanded ? null : s.id)}
-            >
-              <div className="session-meta">
-                <span className="session-prompt-preview">{s.prompt}</span>
-                <span className={`session-status ${s.status}`}>{s.status}</span>
-              </div>
-              <div className="session-time">{formatTime(s.startedAt)}</div>
+            {sessions.map((s) => {
+              const isExpanded = expandedId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  className={`session-card${isExpanded ? " expanded" : ""}`}
+                  onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                >
+                  <div className="session-meta">
+                    <span className="session-prompt-preview">{s.prompt}</span>
+                    <span className={`session-status ${s.status}`}>{s.status}</span>
+                  </div>
+                  <div className="session-time">{formatTime(s.startedAt)}</div>
 
-              {isExpanded && (
-                <div className="session-detail">
-                  {s.liveUrl && s.status === "running" && (
-                    <>
-                      <div className="session-detail-label">Live View</div>
-                      <div className="live-view-container">
-                        <iframe
-                          src={s.liveUrl}
-                          className="live-view-iframe"
-                          allow="autoplay"
-                        />
-                      </div>
-                    </>
-                  )}
+                  {isExpanded && (
+                    <div className="session-detail">
+                      <div className="session-detail-label">Full Prompt</div>
+                      <pre>{s.prompt}</pre>
 
-                  <div className="session-detail-label">Full Prompt</div>
-                  <pre>{s.prompt}</pre>
-
-                  {s.logs.length > 0 && (
-                    <>
-                      <div className="session-detail-label" style={{ marginTop: 12 }}>
-                        Logs
-                      </div>
-                      <pre>
-                        {s.logs.map((l, i) => (
-                          <div key={i} className="log-line">
-                            {l}
+                      {s.logs.length > 0 && (
+                        <>
+                          <div className="session-detail-label" style={{ marginTop: 12 }}>
+                            Logs
                           </div>
-                        ))}
-                      </pre>
-                    </>
-                  )}
+                          <pre>
+                            {s.logs.map((l, i) => (
+                              <div key={i} className="log-line">
+                                {l}
+                              </div>
+                            ))}
+                          </pre>
+                        </>
+                      )}
 
-                  {s.result && (
-                    <>
-                      <div className="session-detail-label" style={{ marginTop: 12 }}>
-                        Result
-                      </div>
-                      <pre className="result-text">{s.result}</pre>
-                    </>
-                  )}
+                      {s.result && (
+                        <>
+                          <div className="session-detail-label" style={{ marginTop: 12 }}>
+                            Result
+                          </div>
+                          <pre className="result-text">{s.result}</pre>
+                        </>
+                      )}
 
-                  {s.error && (
-                    <>
-                      <div className="session-detail-label" style={{ marginTop: 12 }}>
-                        Error
-                      </div>
-                      <pre className="error-text">{s.error}</pre>
-                    </>
+                      {s.error && (
+                        <>
+                          <div className="session-detail-label" style={{ marginTop: 12 }}>
+                            Error
+                          </div>
+                          <pre className="error-text">{s.error}</pre>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              );
+            })}
+          </section>
+        </div>
+
+        <div className="right-panel">
+          {activeSession?.liveUrl && activeSession.status === "running" ? (
+            <>
+              <div className="preview-header">
+                <span className="session-detail-label">Live View</span>
+                <span className={`session-status ${activeSession.status}`}>{activeSession.status}</span>
+              </div>
+              <div className="live-view-container">
+                <iframe
+                  src={activeSession.liveUrl}
+                  className="live-view-iframe"
+                  allow="autoplay"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="preview-empty">
+              {activeSession && !activeSession.liveUrl && activeSession.status === "running"
+                ? "Waiting for live view..."
+                : "Select a running session to see the live preview"}
             </div>
-          );
-        })}
-      </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

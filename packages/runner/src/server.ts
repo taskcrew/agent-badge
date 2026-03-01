@@ -41,8 +41,10 @@ app.use("*", basicAuth({ username: DASHBOARD_USER, password: DASHBOARD_PASS }));
 
 app.post("/api/execute", async (c) => {
   const { prompt } = await c.req.json();
+  console.log(`[POST /api/execute] prompt="${prompt}"`);
 
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+    console.warn(`[POST /api/execute] rejected — empty prompt`);
     return c.json({ error: "Prompt is required" }, 400);
   }
 
@@ -56,8 +58,10 @@ app.post("/api/execute", async (c) => {
   };
 
   sessions.set(id, session);
+  console.log(`[POST /api/execute] session ${id} created`);
 
   runAgent(session).catch((err) => {
+    console.error(`[runAgent] session ${id} unhandled error:`, err);
     session.status = "error";
     session.error = err.message ?? String(err);
     session.completedAt = new Date().toISOString();
@@ -67,12 +71,18 @@ app.post("/api/execute", async (c) => {
 });
 
 app.get("/api/sessions/:id", (c) => {
-  const session = sessions.get(c.req.param("id"));
-  if (!session) return c.json({ error: "Session not found" }, 404);
+  const id = c.req.param("id");
+  const session = sessions.get(id);
+  if (!session) {
+    console.warn(`[GET /api/sessions/${id}] not found`);
+    return c.json({ error: "Session not found" }, 404);
+  }
+  console.log(`[GET /api/sessions/${id}] status=${session.status}`);
   return c.json(session);
 });
 
 app.get("/api/sessions", (c) => {
+  console.log(`[GET /api/sessions] total=${sessions.size}`);
   const list = Array.from(sessions.values())
     .sort(
       (a, b) =>
@@ -100,51 +110,74 @@ export default {
 // ---------- agent runner ----------
 
 async function runAgent(session: RunSession) {
+  console.log(`[runAgent] session ${session.id} starting — prompt="${session.prompt}"`);
   session.logs.push("Initializing browser agent...");
 
   try {
-    const run = client.run(session.prompt);
+    // Create the task explicitly so we can grab sessionId + liveUrl before iterating
+    const created = await client.tasks.create({ task: session.prompt });
+    console.log(`[runAgent] session ${session.id} — taskId=${created.id}, sessionId=${created.sessionId}`);
 
-    // Resolve the live URL once the task is created
-    resolveAndSetLiveUrl(run, session);
-
-    for await (const step of run) {
-      session.logs.push(`[Step ${step.number}] ${step.nextGoal ?? ""}`);
+    // Fetch liveUrl from the session (browser may need a few seconds to spin up)
+    try {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const browserSession = await client.sessions.get(created.sessionId);
+        if (browserSession.liveUrl) {
+          session.liveUrl = browserSession.liveUrl;
+          session.logs.push(`Live view: ${browserSession.liveUrl}`);
+          console.log(`[runAgent] session ${session.id} — liveUrl=${browserSession.liveUrl}`);
+          break;
+        }
+        console.log(`[runAgent] session ${session.id} — liveUrl not ready yet (attempt ${attempt + 1}/10)`);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (!session.liveUrl) {
+        console.warn(`[runAgent] session ${session.id} — liveUrl never became available`);
+      }
+    } catch (err) {
+      console.warn(`[runAgent] session ${session.id} — failed to fetch liveUrl:`, err);
     }
 
-    const result = run.result!;
-    session.status = "completed";
-    session.result = result.output ?? "";
-    session.logs.push("Task completed successfully.");
+    // Now poll for steps until completion
+    let lastStepCount = 0;
+    let task = await client.tasks.get(created.id);
+
+    while (task.status === "created" || task.status === "started") {
+      if (task.steps && task.steps.length > lastStepCount) {
+        for (let i = lastStepCount; i < task.steps.length; i++) {
+          const step = task.steps[i];
+          const msg = `[Step ${step.number}] ${step.nextGoal ?? ""}`;
+          console.log(`[runAgent] session ${session.id} ${msg}`);
+          session.logs.push(msg);
+        }
+        lastStepCount = task.steps.length;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+      task = await client.tasks.get(created.id);
+    }
+
+    // Process any remaining steps
+    if (task.steps && task.steps.length > lastStepCount) {
+      for (let i = lastStepCount; i < task.steps.length; i++) {
+        const step = task.steps[i];
+        const msg = `[Step ${step.number}] ${step.nextGoal ?? ""}`;
+        console.log(`[runAgent] session ${session.id} ${msg}`);
+        session.logs.push(msg);
+      }
+    }
+
+    session.status = task.isSuccess ? "completed" : "error";
+    session.result = task.output ?? "";
+    if (!task.isSuccess) session.error = task.output ?? "Task failed";
+    session.logs.push(task.isSuccess ? "Task completed successfully." : "Task failed.");
     session.completedAt = new Date().toISOString();
+    console.log(`[runAgent] session ${session.id} ${session.status}`);
   } catch (err: any) {
     session.status = "error";
     session.error = err.message ?? String(err);
     session.logs.push(`Error: ${session.error}`);
     session.completedAt = new Date().toISOString();
-  }
-}
-
-async function resolveAndSetLiveUrl(run: ReturnType<typeof client.run>, session: RunSession) {
-  try {
-    // Wait for the task to be created so we have a taskId
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (run.taskId) { clearInterval(check); resolve(); }
-      }, 200);
-      setTimeout(() => { clearInterval(check); resolve(); }, 10_000);
-    });
-
-    if (!run.taskId) return;
-
-    const task = await client.tasks.get(run.taskId);
-    const browserSession = await client.sessions.get(task.sessionId);
-    if (browserSession.liveUrl) {
-      session.liveUrl = browserSession.liveUrl;
-      session.logs.push(`Live view available`);
-    }
-  } catch {
-    // non-critical — live URL is best-effort
+    console.error(`[runAgent] session ${session.id} failed:`, err);
   }
 }
 
