@@ -391,6 +391,16 @@ main {
   animation: ledBlink 2s ease-in-out infinite;
 }
 
+.status-led.idle {
+  background: #ffd600;
+  box-shadow: 0 0 6px #ffd600;
+}
+
+.status-led.dormant {
+  background: #888;
+  box-shadow: none;
+}
+
 .data-row.status-row {
   border-top: 1px dashed var(--cream-shadow);
   padding-top: 8px;

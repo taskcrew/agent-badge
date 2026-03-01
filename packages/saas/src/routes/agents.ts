@@ -14,6 +14,10 @@ import {
   getAgentMailbox,
   setAgentMailbox,
   deleteAgentMailbox,
+  rotateAgentKey,
+  getAgentLastActivityMap,
+  getRecentActivityForAllAgents,
+  getDeniedCountByAgent,
 } from "../store";
 
 const app = new Hono();
@@ -21,20 +25,28 @@ const app = new Hono();
 // POST /agents - Create a new agent
 app.post("/", async (c) => {
   const body = await c.req.json();
-  const { name } = body;
+  const { name, description } = body;
   if (!name || typeof name !== "string") {
     return c.json({ error: "name is required" }, 400);
   }
-  const agent = await createAgent(name);
+  const agent = await createAgent(name, description || "");
   return c.json(agent, 201);
 });
 
-// GET /agents - List all agents (includes linked credential IDs)
+// GET /agents - List all agents (includes linked credential IDs, activity data)
 app.get("/", async (c) => {
-  const agents = await listAgents();
+  const [agents, lastActivityMap, recentActivityMap, deniedCountMap] = await Promise.all([
+    listAgents(),
+    getAgentLastActivityMap(),
+    getRecentActivityForAllAgents(),
+    getDeniedCountByAgent(),
+  ]);
   const result = await Promise.all(
     agents.map(async (agent) => ({
       ...agent,
+      lastActivityAt: lastActivityMap.get(agent.id) || null,
+      recentActivity: recentActivityMap.get(agent.id) || [],
+      deniedCount: deniedCountMap.get(agent.id) || 0,
       linkedCredentials: await getLinkedCredentials(agent.id),
       linkedOAuthConnections: await getLinkedOAuthConnections(agent.id),
       mailboxAddress: await getAgentMailbox(agent.id).then((addr) =>
@@ -49,12 +61,23 @@ app.get("/", async (c) => {
 app.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
-  const { name } = body;
-  if (!name || typeof name !== "string") {
-    return c.json({ error: "name is required" }, 400);
+  const { name, description, expiresAt } = body;
+  if (!name && description === undefined && expiresAt === undefined) {
+    return c.json({ error: "At least one field is required" }, 400);
   }
-  const agent = await updateAgent(id, { name });
+  const agent = await updateAgent(id, { name, description, expiresAt });
   return c.json(agent);
+});
+
+// PATCH /agents/:id/rotate-key - Rotate an agent's API key
+app.patch("/:id/rotate-key", async (c) => {
+  const id = c.req.param("id");
+  try {
+    const agent = await rotateAgentKey(id);
+    return c.json(agent);
+  } catch {
+    return c.json({ error: "Agent not found" }, 404);
+  }
 });
 
 // DELETE /agents/:id - Delete an agent and all cascaded data

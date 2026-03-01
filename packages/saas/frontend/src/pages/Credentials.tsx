@@ -8,6 +8,8 @@ interface Credential {
   url: string;
   email: string;
   useAgentEmail: boolean;
+  accessCount: number;
+  lastAccessed: string | null;
   createdAt: string;
 }
 
@@ -205,6 +207,8 @@ export default function Credentials() {
               <th>Identity</th>
               <th>Secret</th>
               <th>Agent Email</th>
+              <th>Accesses</th>
+              <th>Last Used</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -232,6 +236,14 @@ export default function Credentials() {
                       <span style={{ color: "var(--sys-green)", fontSize: "0.8rem" }}>ON</span>
                     )}
                   </td>
+                  <td style={{ textAlign: "center", color: "var(--sys-cyan-dim)" }}>
+                    {cred.accessCount}
+                  </td>
+                  <td style={{ fontSize: "0.8rem", color: "var(--sys-cyan-dim)" }}>
+                    {cred.lastAccessed
+                      ? new Date(cred.lastAccessed).toLocaleDateString()
+                      : "Never"}
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
@@ -253,7 +265,7 @@ export default function Credentials() {
             )}
             {credentials.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-state">
+                <td colSpan={8} className="empty-state">
                   NO VAULT NODES LINKED
                 </td>
               </tr>

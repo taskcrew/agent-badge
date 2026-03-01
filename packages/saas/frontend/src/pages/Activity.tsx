@@ -8,6 +8,8 @@ interface ActivityEntry {
   agentName: string;
   action: string;
   site: string;
+  credentialId: string;
+  detail: string;
   timestamp: string;
 }
 
@@ -35,16 +37,19 @@ function isDenied(action: string) {
 }
 
 function formatEntryText(entry: ActivityEntry, info: { protocol: string; label: string }, denied: boolean) {
-  return [
-    `EVENT_ID:    ${entry.id}`,
-    `TIMESTAMP:   ${new Date(entry.timestamp).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC")}`,
-    `AGENT_ID:    ${entry.agentId}`,
-    `AGENT_NAME:  ${entry.agentName}`,
-    `ACTION:      ${entry.action}`,
-    `PROTOCOL:    ${info.protocol}`,
-    `TARGET_SITE: ${entry.site}`,
-    `STATUS:      ${denied ? "FAILED / DENIED" : "SUCCESS"} (${info.label})`,
-  ].join("\n");
+  const lines = [
+    `EVENT_ID:      ${entry.id}`,
+    `TIMESTAMP:     ${new Date(entry.timestamp).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC")}`,
+    `AGENT_ID:      ${entry.agentId}`,
+    `AGENT_NAME:    ${entry.agentName}`,
+    `ACTION:        ${entry.action}`,
+    `PROTOCOL:      ${info.protocol}`,
+    `TARGET_SITE:   ${entry.site}`,
+    `STATUS:        ${denied ? "FAILED / DENIED" : "SUCCESS"} (${info.label})`,
+  ];
+  if (entry.credentialId) lines.push(`CREDENTIAL_ID: ${entry.credentialId}`);
+  if (entry.detail) lines.push(`DETAIL:        ${entry.detail}`);
+  return lines.join("\n");
 }
 
 export default function Activity() {
@@ -138,6 +143,17 @@ export default function Activity() {
                       </div>
                       <div style={{ flex: 1, padding: 15 }} className={denied ? "text-red" : "text-cyan"}>
                         {entry.site.toUpperCase()}
+                        {entry.detail === "first_access" && (
+                          <span style={{
+                            marginLeft: 6,
+                            fontSize: "0.55rem",
+                            padding: "1px 4px",
+                            background: "#ffd600",
+                            color: "#000",
+                            borderRadius: 2,
+                            fontWeight: 700,
+                          }}>1ST</span>
+                        )}
                       </div>
                       <div style={{ flex: "0 0 120px", padding: 15 }} className={cls}>
                         {info.protocol}
@@ -184,6 +200,22 @@ export default function Activity() {
                               {denied ? "FAILED / DENIED" : "SUCCESS"}
                             </span>
                           </div>
+                          {entry.credentialId && (
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">CREDENTIAL_ID</span>
+                              <span className="audit-detail-value">{entry.credentialId}</span>
+                            </div>
+                          )}
+                          {entry.detail && (
+                            <div className="audit-detail-item">
+                              <span className="audit-detail-label">DETAIL</span>
+                              <span className={`audit-detail-value ${entry.detail === "first_access" ? "" : denied ? "text-red" : ""}`}
+                                style={entry.detail === "first_access" ? { color: "#ffd600" } : undefined}
+                              >
+                                {entry.detail === "first_access" ? "FIRST ACCESS" : entry.detail.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <button
                           className="row-action-btn"

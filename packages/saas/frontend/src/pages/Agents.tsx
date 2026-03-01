@@ -2,14 +2,39 @@ import { useEffect, useState, useRef, type MouseEvent } from "react";
 
 const API = "";
 
+interface RecentActivityEntry {
+  id: string;
+  agentName: string;
+  action: string;
+  site: string;
+  detail: string;
+  timestamp: string;
+}
+
 interface Agent {
   id: string;
   name: string;
   apiKey: string;
+  description: string;
+  expiresAt: string | null;
   createdAt: string;
+  lastActivityAt: string | null;
+  recentActivity: RecentActivityEntry[];
+  deniedCount: number;
   linkedCredentials: string[];
   linkedOAuthConnections: string[];
   mailboxAddress: string | null;
+}
+
+function computeStatus(lastActivityAt: string | null, expiresAt: string | null): { label: string; color: string; ledClass: string } {
+  if (expiresAt && new Date(expiresAt) < new Date()) {
+    return { label: "EXPIRED", color: "var(--alert-red)", ledClass: "dormant" };
+  }
+  if (!lastActivityAt) return { label: "DORMANT", color: "#888", ledClass: "dormant" };
+  const diffMs = Date.now() - new Date(lastActivityAt).getTime();
+  if (diffMs < 60 * 60 * 1000) return { label: "ACTIVE", color: "#00c853", ledClass: "active" };
+  if (diffMs < 24 * 60 * 60 * 1000) return { label: "IDLE", color: "#ffd600", ledClass: "idle" };
+  return { label: "DORMANT", color: "#888", ledClass: "dormant" };
 }
 
 interface Credential {
@@ -218,11 +243,57 @@ function MailboxSection({
   );
 }
 
+function RecentActivityFeed({ activity }: { activity: RecentActivityEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (activity.length === 0) return null;
+
+  return (
+    <div className="vault-linker" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="vault-linker-label"
+        style={{ cursor: "pointer", userSelect: "none" }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? "\u25BE" : "\u25B8"} Recent Activity ({activity.length})
+      </div>
+      {expanded && (
+        <div style={{ fontSize: "0.6rem", fontFamily: "'IBM Plex Mono', monospace" }}>
+          {activity.map((a) => {
+            const denied = a.action.includes("denied") || a.action.includes("failed");
+            return (
+              <div key={a.id} style={{
+                padding: "2px 0",
+                color: denied ? "var(--alert-red)" : "var(--ink-muted)",
+              }}>
+                {new Date(a.timestamp).toLocaleTimeString("en-US", { hour12: false })}
+                {" "}{a.action.replace(/_/g, " ").toUpperCase()}
+                {" \u2192 "}{a.site.toUpperCase()}
+                {a.detail === "first_access" && (
+                  <span style={{
+                    marginLeft: 4,
+                    fontSize: "0.5rem",
+                    padding: "0 3px",
+                    background: "#ffd600",
+                    color: "#000",
+                    borderRadius: 2,
+                    fontWeight: 700,
+                  }}>1ST</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [oauthConnections, setOAuthConnections] = useState<OAuthConnection[]>([]);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -249,9 +320,10 @@ export default function Agents() {
     await fetch(`${API}/agents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
+      body: JSON.stringify({ name: name.trim(), description: description.trim() }),
     });
     setName("");
+    setDescription("");
     fetchAgents();
   };
 
@@ -271,6 +343,16 @@ export default function Agents() {
     if (!confirm("Delete this agent? All linked credentials, OAuth connections, and mailbox will be unlinked.")) return;
     await fetch(`${API}/agents/${id}`, { method: "DELETE" });
     fetchAgents();
+  };
+
+  const rotateKey = async (id: string) => {
+    if (!confirm("Rotate API key? The current key will stop working immediately.")) return;
+    const res = await fetch(`${API}/agents/${id}/rotate-key`, { method: "PATCH" });
+    if (res.ok) {
+      const updated = await res.json();
+      alert(`New API key:\n${updated.apiKey}\n\nCopy this now — it won't be shown again.`);
+      fetchAgents();
+    }
   };
 
   const linkCredential = async (agentId: string, credentialId: string) => {
@@ -347,6 +429,14 @@ export default function Agents() {
             placeholder="AGENT_IDENTIFIER"
             className="term-input"
           />
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && createAgent()}
+            placeholder="DESCRIPTION (optional)"
+            className="term-input"
+          />
           <button onClick={createAgent} className="term-submit">
             Issue Badge
           </button>
@@ -391,6 +481,11 @@ export default function Agents() {
                   ) : (
                     <div className="agent-name">{agent.name}</div>
                   )}
+                  {agent.description && (
+                    <div style={{ fontSize: "0.6rem", color: "var(--ink-muted)", fontStyle: "italic", marginTop: 2 }}>
+                      {agent.description}
+                    </div>
+                  )}
                 </div>
                 <div className="agent-number">{String(idx + 1).padStart(2, "0")}</div>
               </div>
@@ -415,12 +510,38 @@ export default function Agents() {
                     <span className="data-label">Key Sig</span>
                     <span className="data-val api-key-mask">{maskKey(agent.apiKey)}</span>
                   </div>
-                  <div className="data-row status-row">
-                    <span className="data-label">Status</span>
-                    <span className="data-val" style={{ color: "#00c853" }}>
-                      <span className="status-led active" />ACTIVE
-                    </span>
-                  </div>
+                  {agent.expiresAt && (
+                    <div className="data-row">
+                      <span className="data-label">Expires</span>
+                      <span className="data-val" style={{
+                        color: new Date(agent.expiresAt) < new Date() ? "var(--alert-red)"
+                          : new Date(agent.expiresAt).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 ? "#ffd600"
+                          : "var(--sys-cyan-dim)",
+                      }}>
+                        {new Date(agent.expiresAt) < new Date() ? "EXPIRED " : ""}
+                        {new Date(agent.expiresAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {agent.deniedCount > 0 && (
+                    <div className="data-row">
+                      <span className="data-label">Denied</span>
+                      <span className="data-val" style={{ color: "var(--alert-red)" }}>
+                        {agent.deniedCount} REQ{agent.deniedCount > 1 ? "S" : ""}
+                      </span>
+                    </div>
+                  )}
+                  {(() => {
+                    const status = computeStatus(agent.lastActivityAt, agent.expiresAt);
+                    return (
+                      <div className="data-row status-row">
+                        <span className="data-label">Status</span>
+                        <span className="data-val" style={{ color: status.color }}>
+                          <span className={`status-led ${status.ledClass}`} />{status.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -432,6 +553,12 @@ export default function Agents() {
                   onClick={() => { setEditingId(agent.id); setEditName(agent.name); }}
                 >
                   Rename
+                </button>
+                <button
+                  className="row-action-btn"
+                  onClick={() => rotateKey(agent.id)}
+                >
+                  Rotate Key
                 </button>
                 <button
                   className="row-action-btn delete"
@@ -460,6 +587,8 @@ export default function Agents() {
                 onCreate={createMailbox}
                 onDelete={deleteMailbox}
               />
+
+              <RecentActivityFeed activity={agent.recentActivity} />
             </div>
 
             <Barcode seed={agent.id} />

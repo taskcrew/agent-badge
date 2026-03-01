@@ -11,6 +11,9 @@ import {
   updateCredential,
   deleteCredential,
   getAgentMailbox,
+  isAgentExpired,
+  isFirstAccess,
+  getCredentialAccessStats,
 } from "../store";
 
 const app = new Hono();
@@ -26,9 +29,22 @@ app.post("/", async (c) => {
   return c.json({ id: cred.id, site: cred.site, url: cred.url, email: cred.email, useAgentEmail: cred.useAgentEmail, createdAt: cred.createdAt }, 201);
 });
 
-// GET /credentials - List stored credentials (passwords redacted)
+// GET /credentials - List stored credentials (passwords redacted, with access stats)
 app.get("/", async (c) => {
-  return c.json(await listCredentials());
+  const [credentials, stats] = await Promise.all([
+    listCredentials(),
+    getCredentialAccessStats(),
+  ]);
+  const statsMap = new Map(stats.map((s) => [s.credentialId, s]));
+  const enriched = credentials.map((cred) => {
+    const stat = statsMap.get(cred.id);
+    return {
+      ...cred,
+      accessCount: stat?.accessCount || 0,
+      lastAccessed: stat?.lastAccessed || null,
+    };
+  });
+  return c.json(enriched);
 });
 
 // PATCH /credentials/:id - Update a credential (only if no X-Agent-Key header)
@@ -68,9 +84,15 @@ app.get("/by-url/*", async (c) => {
 
   const url = decodeURIComponent(c.req.path.replace("/credentials/by-url/", ""));
 
+  // Check badge expiry
+  if (await isAgentExpired(agent.id)) {
+    await logActivity(agent.id, agent.name, "credential_access_denied", url, { detail: "Badge expired" });
+    return c.json({ error: "Agent badge has expired" }, 403);
+  }
+
   const linked = await isAgentLinkedToUrl(agent.id, url);
   if (!linked) {
-    await logActivity(agent.id, agent.name, "credential_access_denied", url);
+    await logActivity(agent.id, agent.name, "credential_access_denied", url, { detail: "Agent not linked to URL" });
     return c.json({ error: "Agent is not authorized for this URL" }, 403);
   }
 
@@ -79,7 +101,11 @@ app.get("/by-url/*", async (c) => {
     return c.json({ error: "No credentials found for this URL" }, 404);
   }
 
-  await logActivity(agent.id, agent.name, "credential_access", url);
+  const firstAccess = await isFirstAccess(agent.id, url);
+  await logActivity(agent.id, agent.name, "credential_access", url, {
+    credentialId: cred.id,
+    detail: firstAccess ? "first_access" : "",
+  });
 
   let responseEmail = cred.email;
   if (cred.useAgentEmail) {
@@ -105,9 +131,15 @@ app.get("/:site", async (c) => {
 
   const site = c.req.param("site");
 
+  // Check badge expiry
+  if (await isAgentExpired(agent.id)) {
+    await logActivity(agent.id, agent.name, "credential_access_denied", site, { detail: "Badge expired" });
+    return c.json({ error: "Agent badge has expired" }, 403);
+  }
+
   const linked = await isAgentLinkedToSite(agent.id, site);
   if (!linked) {
-    await logActivity(agent.id, agent.name, "credential_access_denied", site);
+    await logActivity(agent.id, agent.name, "credential_access_denied", site, { detail: "Agent not linked to site" });
     return c.json({ error: "Agent is not authorized for this site" }, 403);
   }
 
@@ -116,7 +148,11 @@ app.get("/:site", async (c) => {
     return c.json({ error: "No credentials found for this site" }, 404);
   }
 
-  await logActivity(agent.id, agent.name, "credential_access", site);
+  const siteFirstAccess = await isFirstAccess(agent.id, site);
+  await logActivity(agent.id, agent.name, "credential_access", site, {
+    credentialId: cred.id,
+    detail: siteFirstAccess ? "first_access" : "",
+  });
 
   let siteResponseEmail = cred.email;
   if (cred.useAgentEmail) {

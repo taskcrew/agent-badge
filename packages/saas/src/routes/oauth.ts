@@ -10,6 +10,7 @@ import {
   findAgentByApiKey,
   getAgentOAuthLink,
   logActivity,
+  isAgentExpired,
 } from "../store";
 
 const app = new Hono();
@@ -220,10 +221,16 @@ app.post("/token", async (c) => {
     return c.json({ error: "oauthConnectionId is required" }, 400);
   }
 
+  // Check badge expiry
+  if (await isAgentExpired(agent.id)) {
+    await logActivity(agent.id, agent.name, "oauth_token_denied", "google", { detail: "Badge expired" });
+    return c.json({ error: "Agent badge has expired" }, 403);
+  }
+
   // Check agent is linked to this OAuth connection
   const link = await getAgentOAuthLink(agent.id, oauthConnectionId);
   if (!link) {
-    await logActivity(agent.id, agent.name, "oauth_token_denied", "google");
+    await logActivity(agent.id, agent.name, "oauth_token_denied", "google", { detail: "Agent not linked to OAuth connection" });
     return c.json(
       { error: "Agent is not authorized for this OAuth connection" },
       403
@@ -240,7 +247,8 @@ app.post("/token", async (c) => {
           agent.id,
           agent.name,
           "oauth_token_denied",
-          "google"
+          "google",
+          { detail: `Scope not allowed: ${scope}` }
         );
         return c.json({ error: `Scope '${scope}' is not allowed` }, 403);
       }
@@ -254,7 +262,7 @@ app.post("/token", async (c) => {
   }
 
   if (connection.revoked) {
-    await logActivity(agent.id, agent.name, "oauth_token_denied", "google");
+    await logActivity(agent.id, agent.name, "oauth_token_denied", "google", { detail: "OAuth connection revoked" });
     return c.json({ error: "OAuth connection has been revoked" }, 403);
   }
 
@@ -276,7 +284,7 @@ app.post("/token", async (c) => {
 
   if (!tokenResponse.ok) {
     const body = await tokenResponse.text();
-    await logActivity(agent.id, agent.name, "oauth_token_denied", "google");
+    await logActivity(agent.id, agent.name, "oauth_token_denied", "google", { detail: "Token refresh failed" });
     return c.json({ error: `Token refresh failed: ${body}` }, 502);
   }
 

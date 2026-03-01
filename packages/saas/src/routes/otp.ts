@@ -74,7 +74,7 @@ app.post("/fetch", async (c) => {
 
   const inboxAddress = await getAgentMailbox(agent.id);
   if (!inboxAddress) {
-    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
+    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email", { detail: "No mailbox configured" });
     return c.json({ success: false, error: "No mailbox configured for this agent. Create one via POST /otp/mailbox first." }, 400);
   }
 
@@ -87,7 +87,7 @@ app.post("/fetch", async (c) => {
     const listResponse = await client.inboxes.messages.list(inboxId);
 
     if (!listResponse.messages || listResponse.messages.length === 0) {
-      await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
+      await logActivity(agent.id, agent.name, "otp_fetch_failed", "email", { detail: "No messages in inbox" });
       return c.json({ success: false, error: "No OTP email found" });
     }
 
@@ -125,13 +125,13 @@ app.post("/fetch", async (c) => {
       }
     }
 
-    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
+    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email", { detail: "No OTP found in recent messages" });
     return c.json({ success: false, error: "No OTP email found" });
   } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
+    const errDetail = err instanceof Error ? err.message : String(err);
     console.error(`[otp/fetch] AgentMail error for inbox ${inboxId}:`, err);
-    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email");
-    return c.json({ success: false, error: `Failed to fetch messages: ${detail}` }, 502);
+    await logActivity(agent.id, agent.name, "otp_fetch_failed", "email", { detail: errDetail });
+    return c.json({ success: false, error: `Failed to fetch messages: ${errDetail}` }, 502);
   }
 });
 
