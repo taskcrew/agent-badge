@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type MouseEvent } from "react";
+import { useEffect, useState, useRef, useCallback, type MouseEvent } from "react";
 
 const API = "";
 
@@ -357,6 +357,98 @@ function TerminalDialog({
   );
 }
 
+function DestructorDialog({
+  agent,
+  onConfirm,
+  onClose,
+}: {
+  agent: Agent;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const machineRef = useRef<HTMLDivElement>(null);
+  const [shredding, setShredding] = useState(false);
+
+  const spawnDebris = useCallback(() => {
+    const machineFront = machineRef.current?.querySelector(".destructor-machine-front");
+    if (!machineFront) return;
+    const debris = document.createElement("div");
+    debris.className = "destructor-debris";
+    if (Math.random() > 0.8) debris.style.background = "var(--alert-red)";
+    const startX = (Math.random() * 280) - 140;
+    debris.style.transform = `translateX(${startX}px)`;
+    machineFront.appendChild(debris);
+    const angle = (Math.random() * 60) - 30;
+    const throwHeight = Math.random() * -100 - 50;
+    debris.animate([
+      { transform: `translate(${startX}px, 0px) rotate(0deg)`, opacity: 1 },
+      { transform: `translate(${startX + angle}px, ${throwHeight}px) rotate(${Math.random() * 360}deg)`, opacity: 1, offset: 0.4 },
+      { transform: `translate(${startX + angle * 2}px, 100px) rotate(${Math.random() * 720}deg)`, opacity: 0 },
+    ], {
+      duration: 600 + Math.random() * 400,
+      easing: "cubic-bezier(.25,.8,.25,1)",
+    }).onfinish = () => debris.remove();
+  }, []);
+
+  const engage = useCallback(() => {
+    const badge = badgeRef.current;
+    if (!badge || shredding) return;
+    setShredding(true);
+    let depth = 0;
+    badge.style.animation = "destructor-shake 0.08s infinite";
+    const interval = setInterval(() => {
+      depth += 2;
+      badge.style.setProperty("--grind-depth", `${depth}px`);
+      if (depth % 6 === 0) spawnDebris();
+      if (depth > 380) {
+        clearInterval(interval);
+        badge.style.display = "none";
+        setShredding(false);
+        onConfirm();
+        setTimeout(onClose, 400);
+      }
+    }, 20);
+  }, [shredding, spawnDebris, onConfirm, onClose]);
+
+  const status = computeStatus(agent.lastActivityAt, agent.expiresAt);
+
+  return (
+    <div className="destructor-backdrop" onClick={onClose}>
+      <div className="destructor-scene" onClick={(e) => e.stopPropagation()}>
+        <div className="destructor-badge-wrapper">
+          <div className="destructor-badge" ref={badgeRef} style={{ "--grind-depth": "0px" } as React.CSSProperties}>
+            <div className="destructor-punch-hole" />
+            <div className="destructor-mag-stripe" />
+            <div className="destructor-agent-name">{agent.name}</div>
+            <div className="destructor-data-row"><span>CLEARANCE:</span> <strong>{agent.linkedCredentials.length > 0 ? `${agent.linkedCredentials.length} VAULT${agent.linkedCredentials.length > 1 ? "S" : ""}` : "NONE"}</strong></div>
+            <div className="destructor-data-row"><span>KEY_SIG:</span> <strong>{maskKey(agent.apiKey)}</strong></div>
+            <div className="destructor-data-row"><span>STATUS:</span> <strong style={{ color: status.color }}>{status.label}</strong></div>
+          </div>
+        </div>
+
+        <div className={`destructor-machine${shredding ? " shredding" : ""}`} ref={machineRef}>
+          <div className="destructor-machine-front">
+            <div className="destructor-caution-tape" />
+            <div className="destructor-slot">
+              <div className="destructor-slot-glow" />
+              <div className="destructor-teeth" />
+            </div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.6rem", color: "#777", marginTop: 15, letterSpacing: 2 }}>LUMON HW_DESTRUCTOR v2</div>
+          </div>
+        </div>
+
+        <div className="destructor-controls">
+          <button className="row-action-btn" onClick={onClose} disabled={shredding}>Cancel</button>
+          <button className="destructor-engage-btn" onClick={engage} disabled={shredding}>
+            {shredding ? "DESTROYING..." : "Engage Destructor"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -366,6 +458,7 @@ export default function Agents() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [destructorAgent, setDestructorAgent] = useState<Agent | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchAgents = async () => {
@@ -409,17 +502,13 @@ export default function Agents() {
     fetchAgents();
   };
 
-  const deleteAgent = (id: string) => {
-    setDialog({
-      type: "confirm",
-      variant: "delete",
-      title: "Delete Agent",
-      message: "Delete this agent? All linked credentials, OAuth connections, and mailbox will be unlinked.",
-      onConfirm: async () => {
-        await fetch(`${API}/agents/${id}`, { method: "DELETE" });
-        fetchAgents();
-      },
-    });
+  const deleteAgent = (agent: Agent) => {
+    setDestructorAgent(agent);
+  };
+
+  const confirmDeleteAgent = async (id: string) => {
+    await fetch(`${API}/agents/${id}`, { method: "DELETE" });
+    fetchAgents();
   };
 
   const rotateKey = (id: string) => {
@@ -651,7 +740,7 @@ export default function Agents() {
                 </button>
                 <button
                   className="row-action-btn delete"
-                  onClick={() => deleteAgent(agent.id)}
+                  onClick={() => deleteAgent(agent)}
                 >
                   Delete
                 </button>
@@ -694,6 +783,14 @@ export default function Agents() {
 
       {agents.length === 0 && (
         <div className="empty-state">NO BADGES ISSUED // USE FORM ABOVE TO REGISTER AN AGENT</div>
+      )}
+
+      {destructorAgent && (
+        <DestructorDialog
+          agent={destructorAgent}
+          onConfirm={() => confirmDeleteAgent(destructorAgent.id)}
+          onClose={() => setDestructorAgent(null)}
+        />
       )}
 
       {dialog && (
