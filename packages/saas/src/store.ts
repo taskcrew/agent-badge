@@ -69,21 +69,35 @@ export async function initDatabase() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS agent_credentials (
+      agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (agent_id, credential_id)
+    )
+  `;
+
   // Seed demo data if empty
   const agentCount = await sql`SELECT COUNT(*) as count FROM agents`;
   if (Number(agentCount[0].count) === 0) {
-    const demoId = crypto.randomUUID();
+    const demoAgentId = crypto.randomUUID();
+    const demoCredId = crypto.randomUUID();
     await sql`
       INSERT INTO agents (id, name, api_key, created_at)
-      VALUES (${demoId}, 'CRM Bot', 'ab_key_xK9mQ2vL8nP3wR7tY1uJ4s', NOW())
+      VALUES (${demoAgentId}, 'CRM Bot', 'ab_key_xK9mQ2vL8nP3wR7tY1uJ4s', NOW())
     `;
     await sql`
       INSERT INTO credentials (id, site, email, password, created_at)
-      VALUES (${crypto.randomUUID()}, 'crm', 'admin@company.com', 'P@ssw0rd123', NOW())
+      VALUES (${demoCredId}, 'crm', 'admin@company.com', 'P@ssw0rd123', NOW())
+    `;
+    await sql`
+      INSERT INTO agent_credentials (agent_id, credential_id)
+      VALUES (${demoAgentId}, ${demoCredId})
     `;
     await sql`
       INSERT INTO activity (id, agent_id, agent_name, action, site, timestamp)
-      VALUES (${crypto.randomUUID()}, ${demoId}, 'CRM Bot', 'credential_access', 'crm', NOW())
+      VALUES (${crypto.randomUUID()}, ${demoAgentId}, 'CRM Bot', 'credential_access', 'crm', NOW())
     `;
   }
 }
@@ -178,6 +192,47 @@ export async function listCredentials(): Promise<Omit<Credential, "password">[]>
 export async function getCredentialBySite(site: string): Promise<Credential | undefined> {
   const rows = await sql`SELECT * FROM credentials WHERE site = ${site} LIMIT 1`;
   return rows.length > 0 ? rowToCredential(rows[0]) : undefined;
+}
+
+// --- Agent-Credential linking ---
+
+export async function linkAgentCredential(agentId: string, credentialId: string): Promise<void> {
+  await sql`
+    INSERT INTO agent_credentials (agent_id, credential_id)
+    VALUES (${agentId}, ${credentialId})
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+export async function unlinkAgentCredential(agentId: string, credentialId: string): Promise<void> {
+  await sql`
+    DELETE FROM agent_credentials
+    WHERE agent_id = ${agentId} AND credential_id = ${credentialId}
+  `;
+}
+
+export async function getLinkedCredentials(agentId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT credential_id FROM agent_credentials WHERE agent_id = ${agentId}
+  `;
+  return rows.map((r) => r.credential_id as string);
+}
+
+export async function getLinkedAgents(credentialId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT agent_id FROM agent_credentials WHERE credential_id = ${credentialId}
+  `;
+  return rows.map((r) => r.agent_id as string);
+}
+
+export async function isAgentLinkedToSite(agentId: string, site: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 FROM agent_credentials ac
+    JOIN credentials c ON c.id = ac.credential_id
+    WHERE ac.agent_id = ${agentId} AND c.site = ${site}
+    LIMIT 1
+  `;
+  return rows.length > 0;
 }
 
 // --- Activity operations ---

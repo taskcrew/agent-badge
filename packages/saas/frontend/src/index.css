@@ -565,6 +565,101 @@ tr:hover td { background: rgba(77, 243, 255, 0.03); }
   vertical-align: middle;
 }
 
+/* --- COPY KEY BUTTON --- */
+.copy-key-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 0;
+  background: transparent;
+  border: 1px dashed var(--ink-muted);
+  color: var(--ink-muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.copy-key-btn:hover {
+  border-color: var(--sys-cyan-dim);
+  color: var(--sys-cyan-dim);
+  background: rgba(77, 243, 255, 0.05);
+}
+
+/* --- VAULT LINKER --- */
+.vault-linker {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--cream-shadow);
+}
+
+.vault-linker-label {
+  font-size: 0.6rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.vault-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.vault-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border-radius: 2px;
+  cursor: default;
+}
+
+.vault-chip.linked {
+  background: rgba(0, 200, 83, 0.15);
+  color: #00c853;
+  border: 1px solid rgba(0, 200, 83, 0.3);
+}
+
+.vault-chip.available {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px dashed var(--ink-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vault-chip.available:hover {
+  border-color: var(--sys-cyan-dim);
+  color: var(--sys-cyan-dim);
+  background: rgba(77, 243, 255, 0.05);
+}
+
+.vault-chip-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.vault-chip-remove:hover {
+  opacity: 1;
+  color: var(--alert-red);
+}
+
 /* --- 1PASSWORD BADGE --- */
 .onepass-badge {
   border: 1px solid var(--sys-cyan);

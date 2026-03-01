@@ -7,12 +7,18 @@ interface Agent {
   name: string;
   apiKey: string;
   createdAt: string;
+  linkedCredentials: string[];
+}
+
+interface Credential {
+  id: string;
+  site: string;
+  email: string;
 }
 
 const BARCODE_WIDTHS = [2,1,3,1,2,1,1,3,2,1,2,1,3,1,1,2,3,1,2,1,1,3,1,2,1,1,2,3,1,2];
 
 function Barcode({ seed }: { seed: string }) {
-  // Generate a pseudo-unique hex from the seed
   const hex = "0x" + Array.from(seed).reduce((acc, c) => acc + c.charCodeAt(0).toString(16), "").slice(0, 6).toUpperCase();
 
   return (
@@ -34,8 +40,84 @@ function maskKey(key: string): string {
   return "AK_\u2022\u2022\u2022\u2022" + key.slice(-4).toUpperCase();
 }
 
+function CopyKeyButton({ apiKey }: { apiKey: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(apiKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="copy-key-btn"
+      title="Copy full API key"
+    >
+      {copied ? "COPIED" : "COPY KEY"}
+    </button>
+  );
+}
+
+function VaultLinker({
+  agent,
+  credentials,
+  onLink,
+  onUnlink,
+}: {
+  agent: Agent;
+  credentials: Credential[];
+  onLink: (agentId: string, credentialId: string) => void;
+  onUnlink: (agentId: string, credentialId: string) => void;
+}) {
+  const linked = credentials.filter((c) => agent.linkedCredentials.includes(c.id));
+  const unlinked = credentials.filter((c) => !agent.linkedCredentials.includes(c.id));
+
+  return (
+    <div className="vault-linker" onClick={(e) => e.stopPropagation()}>
+      <div className="vault-linker-label">Vault Access</div>
+      {linked.length > 0 && (
+        <div className="vault-chips">
+          {linked.map((cred) => (
+            <span key={cred.id} className="vault-chip linked">
+              {cred.site.toUpperCase()}
+              <button
+                className="vault-chip-remove"
+                onClick={(e) => { e.stopPropagation(); onUnlink(agent.id, cred.id); }}
+                title="Revoke access"
+              >
+                x
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {unlinked.length > 0 && (
+        <div className="vault-chips">
+          {unlinked.map((cred) => (
+            <span
+              key={cred.id}
+              className="vault-chip available"
+              onClick={(e) => { e.stopPropagation(); onLink(agent.id, cred.id); }}
+              title="Grant access"
+            >
+              + {cred.site.toUpperCase()}
+            </span>
+          ))}
+        </div>
+      )}
+      {credentials.length === 0 && (
+        <div style={{ fontSize: "0.65rem", color: "var(--ink-muted)" }}>No vault nodes created yet</div>
+      )}
+    </div>
+  );
+}
+
 export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
   const [name, setName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +126,12 @@ export default function Agents() {
     setAgents(await res.json());
   };
 
-  useEffect(() => { fetchAgents(); }, []);
+  const fetchCredentials = async () => {
+    const res = await fetch(`${API}/credentials`);
+    setCredentials(await res.json());
+  };
+
+  useEffect(() => { fetchAgents(); fetchCredentials(); }, []);
 
   const createAgent = async () => {
     if (!name.trim()) return;
@@ -54,6 +141,22 @@ export default function Agents() {
       body: JSON.stringify({ name: name.trim() }),
     });
     setName("");
+    fetchAgents();
+  };
+
+  const linkCredential = async (agentId: string, credentialId: string) => {
+    await fetch(`${API}/agents/${agentId}/links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId }),
+    });
+    fetchAgents();
+  };
+
+  const unlinkCredential = async (agentId: string, credentialId: string) => {
+    await fetch(`${API}/agents/${agentId}/links/${credentialId}`, {
+      method: "DELETE",
+    });
     fetchAgents();
   };
 
@@ -123,7 +226,11 @@ export default function Agents() {
                 <div className="badge-data">
                   <div className="data-row">
                     <span className="data-label">Clearance</span>
-                    <span className="data-val">ALL_VAULTS</span>
+                    <span className="data-val">
+                      {agent.linkedCredentials.length > 0
+                        ? `${agent.linkedCredentials.length} VAULT${agent.linkedCredentials.length > 1 ? "S" : ""}`
+                        : "NONE"}
+                    </span>
                   </div>
                   <div className="data-row">
                     <span className="data-label">Key Sig</span>
@@ -137,6 +244,15 @@ export default function Agents() {
                   </div>
                 </div>
               </div>
+
+              <CopyKeyButton apiKey={agent.apiKey} />
+
+              <VaultLinker
+                agent={agent}
+                credentials={credentials}
+                onLink={linkCredential}
+                onUnlink={unlinkCredential}
+              />
             </div>
 
             <Barcode seed={agent.id} />

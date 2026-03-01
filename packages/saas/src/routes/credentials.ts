@@ -5,6 +5,7 @@ import {
   getCredentialBySite,
   findAgentByApiKey,
   logActivity,
+  isAgentLinkedToSite,
 } from "../store";
 
 const app = new Hono();
@@ -25,7 +26,7 @@ app.get("/", async (c) => {
   return c.json(await listCredentials());
 });
 
-// GET /credentials/:site - Fetch credentials for a site (requires API key)
+// GET /credentials/:site - Fetch credentials for a site (requires API key + linking)
 app.get("/:site", async (c) => {
   const apiKey = c.req.header("X-Agent-Key");
   if (!apiKey) {
@@ -38,6 +39,14 @@ app.get("/:site", async (c) => {
   }
 
   const site = c.req.param("site");
+
+  // Check if agent is linked to this credential
+  const linked = await isAgentLinkedToSite(agent.id, site);
+  if (!linked) {
+    await logActivity(agent.id, agent.name, "credential_access_denied", site);
+    return c.json({ error: "Agent is not authorized for this site" }, 403);
+  }
+
   const cred = await getCredentialBySite(site);
   if (!cred) {
     return c.json({ error: "No credentials found for this site" }, 404);

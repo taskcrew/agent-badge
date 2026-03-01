@@ -1,5 +1,12 @@
 import { Hono } from "hono";
-import { createAgent, listAgents, findAgentByApiKey } from "../store";
+import {
+  createAgent,
+  listAgents,
+  findAgentByApiKey,
+  linkAgentCredential,
+  unlinkAgentCredential,
+  getLinkedCredentials,
+} from "../store";
 
 const app = new Hono();
 
@@ -14,9 +21,36 @@ app.post("/", async (c) => {
   return c.json(agent, 201);
 });
 
-// GET /agents - List all agents
+// GET /agents - List all agents (includes linked credential IDs)
 app.get("/", async (c) => {
-  return c.json(await listAgents());
+  const agents = await listAgents();
+  const result = await Promise.all(
+    agents.map(async (agent) => ({
+      ...agent,
+      linkedCredentials: await getLinkedCredentials(agent.id),
+    }))
+  );
+  return c.json(result);
+});
+
+// POST /agents/:id/links - Link agent to a credential
+app.post("/:id/links", async (c) => {
+  const agentId = c.req.param("id");
+  const body = await c.req.json();
+  const { credentialId } = body;
+  if (!credentialId) {
+    return c.json({ error: "credentialId is required" }, 400);
+  }
+  await linkAgentCredential(agentId, credentialId);
+  return c.json({ linked: true }, 201);
+});
+
+// DELETE /agents/:id/links/:credentialId - Unlink agent from a credential
+app.delete("/:id/links/:credentialId", async (c) => {
+  const agentId = c.req.param("id");
+  const credentialId = c.req.param("credentialId");
+  await unlinkAgentCredential(agentId, credentialId);
+  return c.json({ unlinked: true });
 });
 
 // POST /auth - Validate an agent API key
