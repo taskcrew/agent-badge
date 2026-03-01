@@ -1,5 +1,7 @@
 import index from "../frontend/index.html";
-import { Agent } from "browser-use";
+import { BrowserUse } from "browser-use-sdk";
+
+const client = new BrowserUse(); // reads BROWSER_USE_API_KEY from env
 
 interface RunSession {
   id: string;
@@ -92,16 +94,15 @@ async function runAgent(session: RunSession) {
   session.logs.push("Initializing browser agent...");
 
   try {
-    const agent = new Agent({
-      task: session.prompt,
-    });
+    const run = client.run(session.prompt);
 
-    session.logs.push("Browser session started. Executing task...");
+    for await (const step of run) {
+      session.logs.push(`[Step ${step.stepNumber}] ${step.nextGoal ?? ""}`);
+    }
 
-    const result = await agent.run();
-
+    const result = run.result!;
     session.status = "completed";
-    session.result = typeof result === "string" ? result : JSON.stringify(result);
+    session.result = result.output ?? "";
     session.logs.push("Task completed successfully.");
     session.completedAt = new Date().toISOString();
   } catch (err: any) {
