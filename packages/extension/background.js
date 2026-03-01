@@ -3,7 +3,7 @@
 // Credentials flow through here but are NEVER stored in memory longer than
 // the lifetime of a single message-response cycle.
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://agent-badge.onrender.com";
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
