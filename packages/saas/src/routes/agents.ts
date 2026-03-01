@@ -96,7 +96,7 @@ app.post("/:id/mailbox", async (c) => {
   }
   const client = new AgentMailClient({ apiKey: AGENTMAIL_API_KEY });
   const inbox = await client.inboxes.create();
-  const inboxAddress = `${inbox.inboxId}@agentmail.to`;
+  const inboxAddress = inbox.inboxId;
   await setAgentMailbox(agentId, inboxAddress);
   return c.json({ inboxAddress }, 201);
 });
