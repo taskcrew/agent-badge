@@ -453,6 +453,30 @@
         console.error("[Agent Badge] Failed:", response?.error);
       }
     }
+
+    // --- Manual Google Sign-In trigger (Ctrl+Shift+G) ---
+    if (e.ctrlKey && e.shiftKey && e.key === "G") {
+      console.log("[Agent Badge] Manual Google Sign-In trigger...");
+      if (!hasGoogleSignIn()) {
+        console.error("[Agent Badge] No Google Sign-In detected on this page.");
+        return;
+      }
+
+      // Try direct POST first
+      const postResult = await tryDirectPost("default");
+      if (postResult) {
+        console.log("[Agent Badge] Direct POST result:", postResult);
+        return;
+      }
+
+      // Fall back to clicking the button
+      console.log("[Agent Badge] Direct POST not available, clicking button...");
+      if (clickGoogleSignInButton()) {
+        console.log("[Agent Badge] Clicked Google Sign-In button.");
+      } else {
+        console.error("[Agent Badge] Could not find Google Sign-In button to click.");
+      }
+    }
   });
 
   // --- Initialization ---
