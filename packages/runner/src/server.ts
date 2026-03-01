@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import { serveStatic } from "hono/bun";
-import { BrowserUse } from "browser-use-sdk";
+import { BrowserUse } from "browser-use-sdk/v3";
 
 const DASHBOARD_USER = process.env.DASHBOARD_USER || "admin";
 const DASHBOARD_PASS = process.env.DASHBOARD_PASS;
@@ -114,62 +114,43 @@ async function runAgent(session: RunSession) {
   session.logs.push("Initializing browser agent...");
 
   try {
-    // Create the task explicitly so we can grab sessionId + liveUrl before iterating
-    const created = await client.tasks.create({ task: session.prompt });
-    console.log(`[runAgent] session ${session.id} — taskId=${created.id}, sessionId=${created.sessionId}`);
+    // v3: create session with task directly — gives us sessionId immediately
+    const created = await client.sessions.create({ task: session.prompt });
+    const buSessionId = created.id;
+    console.log(`[runAgent] session ${session.id} — buSessionId=${buSessionId}`);
 
-    // Fetch liveUrl from the session (browser may need a few seconds to spin up)
-    try {
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const browserSession = await client.sessions.get(created.sessionId);
-        if (browserSession.liveUrl) {
-          session.liveUrl = browserSession.liveUrl;
-          session.logs.push(`Live view: ${browserSession.liveUrl}`);
-          console.log(`[runAgent] session ${session.id} — liveUrl=${browserSession.liveUrl}`);
-          break;
-        }
-        console.log(`[runAgent] session ${session.id} — liveUrl not ready yet (attempt ${attempt + 1}/10)`);
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      if (!session.liveUrl) {
-        console.warn(`[runAgent] session ${session.id} — liveUrl never became available`);
-      }
-    } catch (err) {
-      console.warn(`[runAgent] session ${session.id} — failed to fetch liveUrl:`, err);
+    // Grab liveUrl as soon as it's available
+    if (created.liveUrl) {
+      session.liveUrl = created.liveUrl;
+      session.logs.push(`Live view: ${created.liveUrl}`);
+      console.log(`[runAgent] session ${session.id} — liveUrl=${created.liveUrl}`);
     }
 
-    // Now poll for steps until completion
-    let lastStepCount = 0;
-    let task = await client.tasks.get(created.id);
+    // Poll until terminal status
+    const TERMINAL = new Set(["idle", "stopped", "timed_out", "error"]);
+    let buSession = created;
 
-    while (task.status === "created" || task.status === "started") {
-      if (task.steps && task.steps.length > lastStepCount) {
-        for (let i = lastStepCount; i < task.steps.length; i++) {
-          const step = task.steps[i];
-          const msg = `[Step ${step.number}] ${step.nextGoal ?? ""}`;
-          console.log(`[runAgent] session ${session.id} ${msg}`);
-          session.logs.push(msg);
-        }
-        lastStepCount = task.steps.length;
-      }
+    while (!TERMINAL.has(buSession.status)) {
       await new Promise((r) => setTimeout(r, 2000));
-      task = await client.tasks.get(created.id);
-    }
+      buSession = await client.sessions.get(buSessionId);
 
-    // Process any remaining steps
-    if (task.steps && task.steps.length > lastStepCount) {
-      for (let i = lastStepCount; i < task.steps.length; i++) {
-        const step = task.steps[i];
-        const msg = `[Step ${step.number}] ${step.nextGoal ?? ""}`;
-        console.log(`[runAgent] session ${session.id} ${msg}`);
-        session.logs.push(msg);
+      // Pick up liveUrl if it appeared on a later poll
+      if (!session.liveUrl && buSession.liveUrl) {
+        session.liveUrl = buSession.liveUrl;
+        session.logs.push(`Live view: ${buSession.liveUrl}`);
+        console.log(`[runAgent] session ${session.id} — liveUrl=${buSession.liveUrl}`);
       }
     }
 
-    session.status = task.isSuccess ? "completed" : "error";
-    session.result = task.output ?? "";
-    if (!task.isSuccess) session.error = task.output ?? "Task failed";
-    session.logs.push(task.isSuccess ? "Task completed successfully." : "Task failed.");
+    console.log(`[runAgent] session ${session.id} — final status=${buSession.status}`);
+
+    const succeeded = buSession.status === "idle" || buSession.status === "stopped";
+    session.status = succeeded ? "completed" : "error";
+    session.result = typeof buSession.output === "string"
+      ? buSession.output
+      : JSON.stringify(buSession.output) ?? "";
+    if (!succeeded) session.error = session.result || "Task failed";
+    session.logs.push(succeeded ? "Task completed successfully." : `Task failed (status: ${buSession.status}).`);
     session.completedAt = new Date().toISOString();
     console.log(`[runAgent] session ${session.id} ${session.status}`);
   } catch (err: any) {
